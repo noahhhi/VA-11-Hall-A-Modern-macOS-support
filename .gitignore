@@ -8,3 +8,7 @@ compat/config.mk
 *.log
 .DS_Store
 dist-bin/
+
+# Agent / tooling (defensive: these live outside this repo)
+.qoder/
+.game_inject/
