@@ -68,6 +68,8 @@ The upstream Butterscotch runtime needed VA-11-specific fixes, all included in t
 
 - The scanlines toggle label in the settings panel displays "Off" even when enabled. This is a bug in the game's own logic — the original 32-bit runner behaves identically — and is not a regression of this port.
 - Steam achievements are stubbed; gameplay is unaffected.
+- Steam Cloud syncs saves between Macs only. The publisher's AutoCloud config keeps Windows, macOS, and Linux saves in separate namespaces, so saves never travel to or from a Steam Deck / Windows PC. The original game behaves the same way; no runner change can alter it.
+- Testing cloud sync on a single machine looks like "nothing changed": the cloud copy was uploaded from this machine, so downloading restores identical files. To see it work, delete a file in `~/Library/Application Support/VA_11_Hall_A/saves/` and relaunch — Steam restores it before the game starts.
 
 ## Building from source
 

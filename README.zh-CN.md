@@ -68,6 +68,8 @@ cd VA-11-Hall-A-64bit-universal
 
 - 设置面板中扫描线开关的标签恒显示"Off"。这是游戏自身逻辑的 bug——原版 32 位 runner 表现完全相同——并非本移植的回归。
 - Steam 成就为 stub（不影响游玩）。
+- Steam 云存档仅在 Mac 之间同步。发行商的 AutoCloud 配置将 Windows、macOS、Linux 的存档隔离在三个独立命名空间，存档不会与 Steam Deck / Windows PC 互通。原版游戏行为相同，runner 无法改变。
+- 在同一台机器上测试云同步看起来会像"没反应"：云端内容就是本机刚上传的，拉回来自然一模一样。想直观验证，可删除 `~/Library/Application Support/VA_11_Hall_A/saves/` 里的某个存档再启动游戏——Steam 会在游戏启动前把它从云端还原。
 
 ## 从源码构建
 
