@@ -6,6 +6,11 @@
 #include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <sys/stat.h>
+#endif
+
 /* For SDL_main */
 #if defined(USE_SDL1)
 #include <SDL/SDL_main.h>
@@ -59,6 +64,7 @@ void platformLog(const logType type, const char *format, va_list va) {
     fputs(textPrefix, out);
     if (logColour) fputs(ANSI_COLOUR_CODE_RESET, out);
     vfprintf(out, format, va);
+    fflush(out);
 }
 
 static void printUsage(const char *argv0) {
@@ -195,6 +201,7 @@ static void parseCommandLineArgs(CommandLineArgs* args, int argc, char* argv[]) 
         {"load-type", required_argument, nullptr, 999},
         {"disable-log-colours", no_argument, nullptr, 1003},
         {"disable-log-colors", no_argument, nullptr, 1003},
+        {"mute", no_argument, nullptr, 1004},
 #ifdef ENABLE_VM_OPCODE_PROFILER
         {"profile-opcodes", no_argument, nullptr, 'Q'},
 #endif
@@ -516,6 +523,9 @@ static void parseCommandLineArgs(CommandLineArgs* args, int argc, char* argv[]) 
             case 1003:
                 args->disableLogColours = true;
                 break;
+            case 1004:
+                args->mute = true;
+                break;
             default:
                 printUsage(argv[0]);
                 exit(1);
@@ -523,11 +533,34 @@ static void parseCommandLineArgs(CommandLineArgs* args, int argc, char* argv[]) 
     }
 
     if (optind >= argc) {
-        printUsage(argv[0]);
-        exit(1);
+#ifdef __APPLE__
+        // Bundled-app mode: when launched without arguments from a .app bundle (e.g. via Steam or
+        // Finder), pick up the game data shipped in Contents/Resources/.
+        static char bundleDataPath[4096];
+        uint32_t exeSize = sizeof(bundleDataPath);
+        if (_NSGetExecutablePath(bundleDataPath, &exeSize) == 0) {
+            char* macosDir = strrchr(bundleDataPath, '/');
+            if (macosDir != nullptr) {
+                strcpy(macosDir, "/../Resources/game.ios");
+                char resolved[4096];
+                struct stat st;
+                if (realpath(bundleDataPath, resolved) != nullptr && stat(resolved, &st) == 0) {
+                    args->dataWinPath = bundleDataPath;
+                    // Bundled mode is the player-facing path: default to lazy texture loading
+                    // (1.3GB -> ~540MB footprint on VA-11 Hall-A).
+                    args->lazyTextures = true;
+                    logWarn("bundled mode: using %s (lazy textures on)\n", resolved);
+                }
+            }
+        }
+#endif
+        if (args->dataWinPath == nullptr) {
+            printUsage(argv[0]);
+            exit(1);
+        }
+    } else {
+        args->dataWinPath = argv[optind];
     }
-
-    args->dataWinPath = argv[optind];
 
 #ifdef ENABLE_SCREENSHOTS
     if (hmlen(args->screenshotFrames) > 0 && args->screenshotPattern == nullptr) {

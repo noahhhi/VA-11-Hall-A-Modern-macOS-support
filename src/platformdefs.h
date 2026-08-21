@@ -120,6 +120,7 @@ typedef struct {
     bool opcodeProfiler;
 #endif
     bool disableLogColours;
+    bool mute;
 } CommandLineArgs;
 
 bool platformInit(int32_t reqW, int32_t reqH, const char *title, bool headless);
@@ -134,6 +135,8 @@ bool platformGetWindowSize(int32_t* outW, int32_t* outH);
 bool platformGetScaledWindowSize(int32_t* outW, int32_t* outH);
 void platformSetWindowSize(int32_t width, int32_t height);
 void platformSetWindowTitle(const char* title);
+void platformSetFullscreen(bool fullscreen);
+bool platformGetFullscreen(void);
 void platformSleepUntil(uint64_t time);
 
 extern InputRecording *globalInputRecording;

@@ -17,9 +17,16 @@ typedef struct {
     FileSystem base;
     char* bundlePath; // includes trailing '/'
     char* savePath; // includes trailing '/'
+    char* workingDirectoryOverride; // includes trailing '/', or nullptr. Set by FS_set_working_directory.
 } OverlayFileSystem;
 
 OverlayFileSystem* OverlayFileSystem_create(const char* bundlePath, const char* savePath);
 void OverlayFileSystem_destroy(OverlayFileSystem* fs);
+
+// Hot-swaps the save area (FS_set_gm_save_area). Creates the directory tree if missing. Trailing '/' optional.
+void OverlayFileSystem_setSavePath(OverlayFileSystem* fs, const char* path);
+
+// Sets the working_directory override (FS_set_working_directory). Creates the directory tree if missing.
+void OverlayFileSystem_setWorkingDirectory(OverlayFileSystem* fs, const char* path);
 
 #endif /* _BS_OVERLAY_FILE_SYSTEM_H_ */

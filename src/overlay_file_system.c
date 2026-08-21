@@ -127,6 +127,12 @@ static char* overlayResolvePath(FileSystem* fs, const char* relativePath) {
     char* normalized = normalizePath(relativePath);
     if (isAbsolute(normalized)) return normalized;
 
+    // working_directory query: honor the override set by FS_set_working_directory.
+    if (normalized[0] == '\0' && ofs->workingDirectoryOverride != nullptr) {
+        free(normalized);
+        return safeStrdup(ofs->workingDirectoryOverride);
+    }
+
     // Check if the path is already resolved
     if (strncmp(normalized, ofs->savePath, strlen(ofs->savePath)) == 0) return normalized;
     if (strncmp(normalized, ofs->bundlePath, strlen(ofs->bundlePath)) == 0) return normalized;
@@ -451,5 +457,39 @@ void OverlayFileSystem_destroy(OverlayFileSystem* fs) {
     if (fs == nullptr) return;
     free(fs->bundlePath);
     free(fs->savePath);
+    free(fs->workingDirectoryOverride);
     free(fs);
+}
+
+// mkdir -p for a directory path (trailing slash optional).
+static void ensureDirTree(const char* dirPath) {
+    char buf[1024];
+    size_t len = strlen(dirPath);
+    if (len >= sizeof(buf)) return;
+    memcpy(buf, dirPath, len + 1);
+    for (size_t i = 1; len > i; i++) {
+        if (buf[i] == '/') {
+            buf[i] = '\0';
+            overlayMkdir(buf);
+            buf[i] = '/';
+        }
+    }
+    if (len > 0 && buf[len - 1] == '/') buf[len - 1] = '\0';
+    overlayMkdir(buf);
+}
+
+void OverlayFileSystem_setSavePath(OverlayFileSystem* fs, const char* path) {
+    if (fs == nullptr || path == nullptr) return;
+    char* withSlash = withTrailingSlash(path);
+    ensureDirTree(withSlash);
+    free(fs->savePath);
+    fs->savePath = withSlash;
+}
+
+void OverlayFileSystem_setWorkingDirectory(OverlayFileSystem* fs, const char* path) {
+    if (fs == nullptr || path == nullptr) return;
+    char* withSlash = withTrailingSlash(path);
+    ensureDirTree(withSlash);
+    free(fs->workingDirectoryOverride);
+    fs->workingDirectoryOverride = withSlash;
 }

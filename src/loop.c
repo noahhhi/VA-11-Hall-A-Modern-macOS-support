@@ -874,10 +874,17 @@ int loop(CommandLineArgs args, const char *argv0) {
 #if defined(USE_OPENAL)
             audioSystem = (AudioSystem*) AlAudioSystem_create();
 #elif defined(USE_MINIAUDIO)
-            audioSystem = (AudioSystem*) MaAudioSystem_create(dataWin);
+            MaAudioSystem* maAudio = MaAudioSystem_create(dataWin);
+            // Mute keeps the real audio system (so audio_is_playing etc. still
+            // report correct state for scripts) but locks all gain at zero.
+            maAudio->muted = args.mute;
+            audioSystem = (AudioSystem*) maAudio;
 #else
             audioSystem = (AudioSystem*) NoopAudioSystem_create();
 #endif
+        }
+        if (args.mute) {
+            audioSystem->vtable->setMasterGain(audioSystem, 0.0f);
         }
 
         // Initialize the runner
@@ -901,8 +908,20 @@ int loop(CommandLineArgs args, const char *argv0) {
         runner->setWindowSize = platformSetWindowSize;
         runner->getWindowSize = platformGetWindowSize;
         runner->setWindowTitle = platformSetWindowTitle;
+        runner->setFullscreen = platformSetFullscreen;
+        runner->getFullscreen = platformGetFullscreen;
         Runner_setGameArgs(runner, currentGameArgs, (int32_t) arrlen(currentGameArgs));
         platformInitFunctions(runner);
+
+        // GMS1.4 GEN8 InfoFlags: bit 0x20 = ShowCursor. Games that draw their own
+        // cursor (e.g. VA-11) clear this bit, and the original runner then hides the
+        // system cursor for the whole session. Mirror that behaviour.
+        if ((runner->dataWin->gen8.info & 0x20) == 0) {
+            runner->currentCursor = GML_CR_NONE;
+            if (runner->setCursor != nullptr) {
+                runner->setCursor(GML_CR_NONE);
+            }
+        }
 
         // Set up input recording/playback (both can be active: playback then continue recording)
         if (args.playbackInputsPath != nullptr) {

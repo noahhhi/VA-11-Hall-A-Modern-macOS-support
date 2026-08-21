@@ -225,6 +225,18 @@ void platformSetWindowSize(int32_t width, int32_t height) {
     scr = SDL_SetVideoMode(width, height, 0, (gfx == SOFTWARE ? 0 : SDL_OPENGL) | SDL_RESIZABLE);
 }
 
+void platformSetFullscreen(bool fullscreen) {
+    if (scr == NULL) return;
+    bool isFullscreen = (scr->flags & SDL_FULLSCREEN) != 0;
+    if (isFullscreen != fullscreen) {
+        SDL_WM_ToggleFullScreen(scr);
+    }
+}
+
+bool platformGetFullscreen(void) {
+    return scr != NULL && (scr->flags & SDL_FULLSCREEN) != 0;
+}
+
 void platformGetMousePos(double *xPos, double *yPos) {
     if (!xPos || !yPos) return;
     int mx = 0, my = 0;

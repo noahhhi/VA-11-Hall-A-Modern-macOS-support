@@ -713,12 +713,14 @@ static float maGetSoundLength(AudioSystem* audio, int32_t soundOrInstance) {
 
 static void maSetMasterGain(AudioSystem* audio, float gain) {
     MaAudioSystem* ma = (MaAudioSystem*) audio;
+    if (ma->muted) gain = 0.0f;
     ma_engine_set_volume(&ma->engine, gain);
 }
 
 static void maSetMasterGainForListener(AudioSystem* audio, float gain, int32_t id) {
     MaAudioSystem* ma = (MaAudioSystem*) audio;
     if (id < 0 || id >= MAX_LISTENERS) return;
+    if (ma->muted) gain = 0.0f;
     ma->listenerGains[id] = gain;
     ma_sound_group_set_volume(&ma->listenerGroups[id], gain);
 }

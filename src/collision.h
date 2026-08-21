@@ -40,10 +40,15 @@ static inline InstanceBBox Collision_computeBBox(Runner* runner, Instance* inst)
         return ret;
     }
 
-    GMLReal marginL = (spr->bboxMode == 1) ? 0.0 : (GMLReal) spr->marginLeft;
-    GMLReal marginR = (spr->bboxMode == 1) ? (GMLReal) spr->width : (GMLReal) (spr->marginRight + 1);
-    GMLReal marginT = (spr->bboxMode == 1) ? 0.0 : (GMLReal) spr->marginTop;
-    GMLReal marginB = (spr->bboxMode == 1) ? (GMLReal) spr->height : (GMLReal) (spr->marginBottom + 1);
+    // bboxMode 1 (full image) uses the whole texture; everything else uses the
+    // stored margins. Inverted placeholder margins are normalized (min/max
+    // swapped) at load time by DataWin_fixAutomaticBBoxes, mirroring the native
+    // runner's Compute_BoundingBox.
+    bool fullImageBBox = spr->bboxMode == 1;
+    GMLReal marginL = fullImageBBox ? 0.0 : (GMLReal) spr->marginLeft;
+    GMLReal marginR = fullImageBBox ? (GMLReal) spr->width : (GMLReal) (spr->marginRight + 1);
+    GMLReal marginT = fullImageBBox ? 0.0 : (GMLReal) spr->marginTop;
+    GMLReal marginB = fullImageBBox ? (GMLReal) spr->height : (GMLReal) (spr->marginBottom + 1);
     GMLReal originX = (GMLReal) spr->originX;
     GMLReal originY = (GMLReal) spr->originY;
 
@@ -124,10 +129,12 @@ static inline InstanceOBB Collision_instanceOBB(Sprite* spr, Instance* inst) {
     InstanceOBB obb;
     obb.x = inst->x;
     obb.y = inst->y;
-    GMLReal marginL = spr->bboxMode == 1 ? 0.0 : (GMLReal) spr->marginLeft;
-    GMLReal marginR = spr->bboxMode == 1 ? (GMLReal) spr->width : (GMLReal) (spr->marginRight + 1);
-    GMLReal marginT = spr->bboxMode == 1 ? 0.0 : (GMLReal) spr->marginTop;
-    GMLReal marginB = spr->bboxMode == 1 ? (GMLReal) spr->height : (GMLReal) (spr->marginBottom + 1);
+    // bboxMode 1 (full image) uses the whole texture (see Collision_computeBBox).
+    bool fullImageBBox = spr->bboxMode == 1;
+    GMLReal marginL = fullImageBBox ? 0.0 : (GMLReal) spr->marginLeft;
+    GMLReal marginR = fullImageBBox ? (GMLReal) spr->width : (GMLReal) (spr->marginRight + 1);
+    GMLReal marginT = fullImageBBox ? 0.0 : (GMLReal) spr->marginTop;
+    GMLReal marginB = fullImageBBox ? (GMLReal) spr->height : (GMLReal) (spr->marginBottom + 1);
     GMLReal originX = (GMLReal) spr->originX;
     GMLReal originY = (GMLReal) spr->originY;
     obb.lx0 = inst->imageXscale * (marginL - originX);
@@ -411,10 +418,9 @@ static inline bool Collision_pointInInstance(Sprite* spr, Instance* inst, GMLRea
     int32_t ix = (int32_t) localX;
     int32_t iy = (int32_t) localY;
 
-    // Bounds check
-    if (0 > ix || 0 > iy || ix >= (int32_t) spr->width || iy >= (int32_t) spr->height) return false;
-
     if (Collision_hasFrameMasks(spr)) {
+        // Bounds check against the full texture; the mask test below narrows further.
+        if (0 > ix || 0 > iy || ix >= (int32_t) spr->width || iy >= (int32_t) spr->height) return false;
         // Pick mask for current frame
         uint32_t frameIdx = ((uint32_t) inst->imageIndex) % spr->maskCount;
         uint8_t* mask = spr->masks[frameIdx];
@@ -427,7 +433,14 @@ static inline bool Collision_pointInInstance(Sprite* spr, Instance* inst, GMLRea
         return (mask[my * bytesPerRow + (mx >> 3)] & (1 << (7 - (mx & 7)))) != 0;
     }
 
-    return true;
+    // Non-precise sprites: the collision shape is the bbox-margin rectangle, not the
+    // full texture (matches the native GMS 1.4 runner). bboxMode 1 (full image) uses
+    // the whole texture; automatic margins are made valid by DataWin_fixAutomaticBBoxes.
+    int32_t x0 = spr->bboxMode == 1 ? 0 : spr->marginLeft;
+    int32_t x1 = spr->bboxMode == 1 ? (int32_t) spr->width : spr->marginRight + 1;
+    int32_t y0 = spr->bboxMode == 1 ? 0 : spr->marginTop;
+    int32_t y1 = spr->bboxMode == 1 ? (int32_t) spr->height : spr->marginBottom + 1;
+    return ix >= x0 && ix < x1 && iy >= y0 && iy < y1;
 }
 
 // Returns true if the two instances' collision shapes overlap.

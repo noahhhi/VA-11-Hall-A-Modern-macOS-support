@@ -959,6 +959,12 @@ void DataWin_bumpVersionTo(DataWin* dw, uint32_t major, uint32_t minor, uint32_t
 void GamePath_computeInternal(GamePath* path);
 PathPositionResult GamePath_getPosition(GamePath* path, float t);
 void DataWin_loadTxtrIfNeeded(DataWin* dw, uint32_t textureId);
+
+// Normalizes inverted sprite margins (left > right / top > bottom) by swapping
+// min/max, mirroring CInstance::Compute_BoundingBox in the native runner.
+// The inverted "empty" placeholder covers (almost) the whole sprite after the
+// swap. Call after all chunks are parsed.
+void DataWin_fixAutomaticBBoxes(DataWin* dw);
 void DataWin_loadAudoIfNeeded(DataWin* dw, uint32_t audioEntryId);
 
 #endif /* _BS_DATA_WIN_H_ */

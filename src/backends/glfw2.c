@@ -82,6 +82,16 @@ void platformSetWindowSize(int32_t width, int32_t height) {
     glfwSetWindowSize(width, height);
 }
 
+// GLFW 2 cannot switch to fullscreen after the window is created, so the
+// game's fullscreen toggle is a no-op on this backend.
+void platformSetFullscreen(bool fullscreen) {
+    (void)fullscreen;
+}
+
+bool platformGetFullscreen(void) {
+    return false;
+}
+
 void platformGetMousePos(double *xPos, double *yPos) {
     if (!xPos || !yPos) return;
     int mx = 0, my = 0;

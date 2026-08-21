@@ -236,6 +236,9 @@ static int nsKeyToGML(unsigned short keyCode)
     }
 }
 
+static NSCursor* invisibleCursor(void);
+static NSCursor* nsCursorForGML(int32_t cursorType);
+
 @interface GameView : NSOpenGLView
 @end
 
@@ -298,6 +301,18 @@ static int nsKeyToGML(unsigned short keyCode)
     RunnerMouse_onWheel(g_runner->mouse, dy);
 }
 
+- (void)resetCursorRects {
+    // AppKit is the only reliable owner of the cursor image over time: a one-shot
+    // [NSCursor set] gets reset whenever the window is shown or cursor rects are
+    // recomputed. Register the whole view as a cursor rect using the runner's
+    // current cursor (invisible when the game opts out of the system cursor).
+    NSCursor *cursor = [NSCursor arrowCursor];
+    if (g_runner != nullptr) {
+        cursor = nsCursorForGML(g_runner->currentCursor);
+    }
+    [self addCursorRect:self.bounds cursor:cursor];
+}
+
 @end
 
 void platformSetWindowTitle(const char* title) {
@@ -333,10 +348,44 @@ void platformSetWindowSize(int32_t width, int32_t height) {
     [window setFrame:newFrame display:YES animate:NO];
 }
 
+void platformSetFullscreen(bool fullscreen) {
+    if (window == nil) return;
+    bool isFullscreen = ([window styleMask] & NSWindowStyleMaskFullScreen) != 0;
+    if (isFullscreen != fullscreen) {
+        [window toggleFullScreen:nil];
+    }
+}
+
+bool platformGetFullscreen(void) {
+    if (window == nil) return false;
+    return ([window styleMask] & NSWindowStyleMaskFullScreen) != 0;
+}
+
 void platformGetMousePos(double *xPos, double *yPos) {
+    // Event-driven backends (SDL/GLFW) only see mouse input while the window is
+    // focused; polling [NSWindow mouseLocationOutsideOfEventStream] would make the
+    // in-game cursor follow the pointer while the app is in the background. Freeze
+    // the reported position unless we are the active app.
+    static double lastX = 0.0, lastY = 0.0;
+    if (![NSApp isActive] || window == nil || ![window isKeyWindow]) {
+        *xPos = lastX;
+        *yPos = lastY;
+        return;
+    }
     NSPoint mouseLocation = [window mouseLocationOutsideOfEventStream];
-    *xPos = mouseLocation.x;
-    *yPos = mouseLocation.y;
+    // Window/viewport sizes are reported in backing pixels (see platformGetWindowSize /
+    // platformGetScaledWindowSize), so convert the point-space mouse position to backing
+    // space too, otherwise HiDPI (scale=2) halves mouse coordinates and deltas.
+    NSPoint inView = [glView convertPoint:mouseLocation fromView:nil];
+    NSPoint backing = [glView convertPointToBacking:inView];
+    *xPos = backing.x;
+    // GML mouse coordinates are top-left origin (the SDL backends pass SDL's
+    // top-origin Y straight through), while AppKit view coordinates are
+    // bottom-left origin, so flip Y in backing space.
+    NSRect backingBounds = [glView convertRectToBacking:[glView bounds]];
+    *yPos = backingBounds.size.height - backing.y;
+    lastX = *xPos;
+    lastY = *yPos;
 }
 
 NSMenu* createAppMenu() {
@@ -565,6 +614,17 @@ bool platformInit(int32_t reqW, int32_t reqH, const char *title, bool headless) 
     if (!headless)
         [window makeKeyAndOrderFront:nil];
 
+    // Fullscreen transitions rebuild the window's cursor rects and would revive
+    // the system arrow; re-assert the runner's current cursor when they finish.
+    void (^reassertCursor)(NSNotification *) = ^(NSNotification *note) {
+        (void) note;
+        if (g_runner != nullptr && g_runner->setCursor != nullptr) {
+            g_runner->setCursor(g_runner->currentCursor);
+        }
+    };
+    [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowDidEnterFullScreenNotification object:window queue:[NSOperationQueue mainQueue] usingBlock:reassertCursor];
+    [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowDidExitFullScreenNotification object:window queue:[NSOperationQueue mainQueue] usingBlock:reassertCursor];
+
     [NSApp activateIgnoringOtherApps:YES];
 
     return true;
@@ -581,55 +641,69 @@ void platformExit(void) {
     window = nil;
 }
 
-static void platformSetCursor(int32_t cursorType) {
-    [NSCursor unhide];
+static NSCursor* invisibleCursor(void) {
+    static NSCursor* cursor = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSImage* img = [[NSImage alloc] initWithSize:NSMakeSize(1, 1)];
+        cursor = [[NSCursor alloc] initWithImage:img hotSpot:NSMakePoint(0, 0)];
+    });
+    return cursor;
+}
+
+static NSCursor* nsCursorForGML(int32_t cursorType) {
     switch (cursorType) {
         case GML_CR_DEFAULT:
         case GML_CR_ARROW:
-            [[NSCursor arrowCursor] set];
-            break;
+            return [NSCursor arrowCursor];
         case GML_CR_NONE:
-            [NSCursor hide];
-            break;
+            // A transparent cursor image is far more reliable than the
+            // [NSCursor hide]/unhide counter, which AppKit can unbalance.
+            return invisibleCursor();
         case GML_CR_CROSS:
-            [[NSCursor crosshairCursor] set];
-            break;
+            return [NSCursor crosshairCursor];
         case GML_CR_BEAM:
-            [[NSCursor IBeamCursor] set];
-            break;
+            return [NSCursor IBeamCursor];
 #if USE_PRIVATE_API
         case GML_CR_SIZE_NESW:
-            [[NSCursor _windowResizeNorthEastSouthWestCursor] set];
-            break;
+            return [NSCursor _windowResizeNorthEastSouthWestCursor];
         case GML_CR_SIZE_NWSE:
-            [[NSCursor _windowResizeNorthWestSouthEastCursor] set];
-            break;
+            return [NSCursor _windowResizeNorthWestSouthEastCursor];
 #endif
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= 1060 // 10.6
         case GML_CR_SIZE_NS:
-            [[NSCursor resizeUpDownCursor] set];
-            break;
+            return [NSCursor resizeUpDownCursor];
         case GML_CR_SIZE_WE:
-            [[NSCursor resizeLeftRightCursor] set];
-            break;
+            return [NSCursor resizeLeftRightCursor];
 #endif
         case GML_CR_DRAG:
-            [[NSCursor closedHandCursor] set];
-            break;
+            return [NSCursor closedHandCursor];
         case GML_CR_HANDPOINT:
-            [[NSCursor pointingHandCursor] set];
-            break;
+            return [NSCursor pointingHandCursor];
         case GML_CR_SIZE_ALL:
-            [[NSCursor openHandCursor] set];
-            break;
+            return [NSCursor openHandCursor];
 
         // Uparrow, hourglass, and appstart cursors are not available on macOS, so we fall back to the arrow cursor for these cases.
         case GML_CR_UPARROW:
         case GML_CR_HOURGLASS:
         case GML_CR_APPSTART:
+            return [NSCursor arrowCursor];
         default:
-            [[NSCursor arrowCursor] set];
-            break;
+            // Positive values are sprite cursors; Butterscotch does not render them,
+            // and games drawing their own cursor expect the system one to be gone.
+            if (cursorType > 0) {
+                return invisibleCursor();
+            }
+            return [NSCursor arrowCursor];
+    }
+}
+
+static void platformSetCursor(int32_t cursorType) {
+    [nsCursorForGML(cursorType) set];
+    // Let AppKit re-derive cursor rects so resetCursorRects keeps the new cursor
+    // even after window show/hide or focus changes.
+    if (window != nil && glView != nil) {
+        [window invalidateCursorRectsForView:glView];
     }
 }
 

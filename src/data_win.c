@@ -9,6 +9,8 @@
 
 #include "stb_ds.h"
 #include "utils.h"
+#include "image/image_decoder.h"
+#include <limits.h>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -2659,6 +2661,37 @@ void DataWin_loadTxtrIfNeeded(DataWin* dw, uint32_t textureId) {
     }
 }
 
+// The native GMS runner copies the stored margins into the sprite bbox as-is at
+// load time and normalizes inverted rects (left > right / top > bottom) by
+// swapping min/max in CInstance::Compute_BoundingBox. Games use the inverted
+// "empty" placeholder (left = width-1, right = 0, ...) for invisible hitbox
+// sprites; after the swap that placeholder covers (almost) the whole sprite.
+// Mirror that by swapping inverted margins once, right after parsing.
+void DataWin_fixAutomaticBBoxes(DataWin* dw) {
+    repeat(dw->sprt.count, i) {
+        Sprite* spr = &dw->sprt.sprites[i];
+        if (!spr->present) continue;
+        bool swapped = false;
+        if (spr->marginLeft > spr->marginRight) {
+            int32_t t = spr->marginLeft;
+            spr->marginLeft = spr->marginRight;
+            spr->marginRight = t;
+            swapped = true;
+        }
+        if (spr->marginTop > spr->marginBottom) {
+            int32_t t = spr->marginTop;
+            spr->marginTop = spr->marginBottom;
+            spr->marginBottom = t;
+            swapped = true;
+        }
+        if (swapped) {
+            logWarn("bboxfix: %s normalized to L%d R%d T%d B%d\n",
+                    spr->name ? spr->name : "?",
+                    spr->marginLeft, spr->marginRight, spr->marginTop, spr->marginBottom);
+        }
+    }
+}
+
 static void parseAUDO(BinaryReader* reader, DataWin* dw, bool loadAudioDataLazily) {
     Audo* a = &dw->audo;
 
@@ -2983,6 +3016,9 @@ DataWin* DataWin_parse(const char* filePath, DataWinParserOptions options) {
             }
         }
     }
+
+    // Recompute placeholder automatic bboxes now that TPAG/TXTR are parsed.
+    DataWin_fixAutomaticBBoxes(dw);
 
     // If lazy-loading rooms, keep the file handle open for DataWin_loadRoomPayload, otherwise close it now
     dw->lazyLoadRooms = options.lazyLoadRooms;

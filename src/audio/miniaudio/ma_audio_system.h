@@ -45,6 +45,7 @@ typedef struct {
     AudioStreamEntry streams[MAX_AUDIO_STREAMS];
     ma_sound_group listenerGroups[MAX_LISTENERS];
     float listenerGains[MAX_LISTENERS];
+    bool muted; // When set, master/listener gain setters are forced to 0 (test runs).
 } MaAudioSystem;
 
 MaAudioSystem* MaAudioSystem_create(DataWin* dataWin);

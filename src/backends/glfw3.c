@@ -117,6 +117,27 @@ void platformSetWindowSize(int32_t width, int32_t height) {
     glfwSetWindowSize(window, logicalW, logicalH);
 }
 
+static int glfwWindowedX, glfwWindowedY, glfwWindowedW, glfwWindowedH;
+
+void platformSetFullscreen(bool fullscreen) {
+    if (!window) return;
+    GLFWmonitor* monitor = glfwGetWindowMonitor(window);
+    if (fullscreen && monitor == NULL) {
+        GLFWmonitor* primary = glfwGetPrimaryMonitor();
+        if (primary == NULL) return;
+        const GLFWvidmode* mode = glfwGetVideoMode(primary);
+        glfwGetWindowPos(window, &glfwWindowedX, &glfwWindowedY);
+        glfwGetWindowSize(window, &glfwWindowedW, &glfwWindowedH);
+        glfwSetWindowMonitor(window, primary, 0, 0, mode->width, mode->height, mode->refreshRate);
+    } else if (!fullscreen && monitor != NULL) {
+        glfwSetWindowMonitor(window, NULL, glfwWindowedX, glfwWindowedY, glfwWindowedW, glfwWindowedH, 0);
+    }
+}
+
+bool platformGetFullscreen(void) {
+    return window != NULL && glfwGetWindowMonitor(window) != NULL;
+}
+
 void platformGetMousePos(double *xPos, double *yPos) {
     if (!xPos || !yPos) return;
     glfwGetCursorPos(window, xPos, yPos);

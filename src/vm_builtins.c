@@ -27,6 +27,7 @@
 #include "ini.h"
 #include "audio_system.h"
 #include "file_system.h"
+#include "overlay_file_system.h"
 #include "md5.h"
 #include "sha1.h"
 #include "base64.h"
@@ -1838,6 +1839,19 @@ static RValue builtin_show_debug_message(MAYBE_UNUSED VMContext* ctx, RValue* ar
 
     char* val = RValue_toString(args[0]);
     logInfo("Game: %s\n", val);
+    free(val);
+
+    return RValue_makeUndefined();
+}
+
+static RValue builtin_show_error(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) {
+        logWarn("[show_error] Expected at least 1 argument\n");
+        return RValue_makeUndefined();
+    }
+
+    char* val = RValue_toString(args[0]);
+    logWarn("Game error: %s\n", val);
     free(val);
 
     return RValue_makeUndefined();
@@ -6575,6 +6589,9 @@ STUB_RETURN_ZERO(steam_file_exists)
 STUB_RETURN_UNDEFINED(steam_file_write)
 STUB_RETURN_UNDEFINED(steam_file_read)
 STUB_RETURN_ZERO(steam_get_persona_name)
+STUB_RETURN_ZERO(steam_get_achievement)
+STUB_RETURN_UNDEFINED(steam_set_achievement)
+STUB_RETURN_UNDEFINED(steam_send_screenshot)
 
 // ===[ Audio Built-in Functions ]===
 
@@ -7307,6 +7324,119 @@ static int32_t findFreeTextFileSlot(Runner* runner) {
     return -1;
 }
 
+// Case-insensitive prefix match, for the "%appdata%" style placeholders GMS scripts pass to FS_set_*.
+static bool fsPathStartsWith(const char* str, const char* prefix) {
+    while (*prefix != '\0') {
+        if (*str == '\0' || tolower((unsigned char) *str) != tolower((unsigned char) *prefix)) return false;
+        str++;
+        prefix++;
+    }
+    return true;
+}
+
+// Resolves the "%appdata%"/"%localappdata%" placeholders used by GMS' _gmfilesystem_initialize
+// to the platform's per-user config directory. Other paths pass through unchanged.
+// fallbackName is used when the game's argv[0]-based name extraction yields nothing (common on
+// POSIX paths, where the stock GML script splits on backslashes only).
+// Returns nullptr when no usable directory name can be determined (caller keeps the current area).
+static char* fsResolvePlaceholderPath(const char* path, const char* fallbackName) {
+    bool local = false;
+    const char* rest = nullptr;
+    if (fsPathStartsWith(path, "%localappdata%")) {
+        rest = path + strlen("%localappdata%");
+        local = true;
+    } else if (fsPathStartsWith(path, "%appdata%")) {
+        rest = path + strlen("%appdata%");
+    }
+    if (rest == nullptr) return safeStrdup(path);
+
+    char* owned = nullptr;
+    const char* base = nullptr;
+#ifdef _WIN32
+    base = getenv(local ? "LOCALAPPDATA" : "APPDATA");
+    if (base == nullptr) base = getenv("USERPROFILE");
+#elif defined(__APPLE__)
+    const char* home = getenv("HOME");
+    if (home != nullptr) {
+        size_t len = strlen(home) + strlen("/Library/Application Support") + 1;
+        owned = (char *)safeMalloc(len);
+        snprintf(owned, len, "%s/Library/Application Support", home);
+        base = owned;
+    }
+#else
+    base = getenv("XDG_CONFIG_HOME");
+    if (base == nullptr || base[0] == '\0') {
+        const char* home = getenv("HOME");
+        if (home != nullptr) {
+            size_t len = strlen(home) + strlen("/.config") + 1;
+            owned = (char *)safeMalloc(len);
+            snprintf(owned, len, "%s/.config", home);
+            base = owned;
+        }
+    }
+#endif
+    while (*rest == '/' || *rest == '\\') rest++;
+    // The game's argv[0]-based name extraction splits on backslashes only, so on POSIX paths the
+    // remainder can leak whole path segments (e.g. ".../My Game.app" minus extension). Reduce it
+    // to its basename; the bundled executable is expected to be named after the game.
+    const char* lastSep = strrchr(rest, '/');
+    if (lastSep != nullptr) rest = lastSep + 1;
+    if (*rest == '\0') {
+        if (fallbackName == nullptr || fallbackName[0] == '\0') {
+            free(owned);
+            return nullptr;
+        }
+        rest = fallbackName;
+    }
+    if (base == nullptr) {
+        free(owned);
+        return safeStrdup(rest);
+    }
+    size_t baseLen = strlen(base);
+    size_t restLen = strlen(rest);
+    char* out = (char *)safeMalloc(baseLen + restLen + 2);
+    memcpy(out, base, baseLen);
+    out[baseLen] = '/';
+    memcpy(out + baseLen + 1, rest, restLen + 1);
+    free(owned);
+    return out;
+}
+
+// FS_set_gm_save_area(path) - GMS-internal API: hot-swaps the save area. VA-11 Hall-A uses this (via
+// _gmfilesystem_initialize) to point saves at the Steam AutoCloud directory.
+static RValue builtin_FS_set_gm_save_area(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeUndefined();
+    Runner* runner = ctx->runner;
+    if (runner == nullptr || runner->fileSystem == nullptr) return RValue_makeUndefined();
+    char* raw = RValue_toString(args[0]);
+    char* resolved = fsResolvePlaceholderPath(raw, ctx->dataWin->gen8.name);
+    logWarn("filesystem: FS_set_gm_save_area raw=\"%s\" resolved=\"%s\"\n", raw, resolved != nullptr ? resolved : "(null)");
+    free(raw);
+    if (resolved == nullptr) {
+        return RValue_makeUndefined();
+    }
+    OverlayFileSystem_setSavePath((OverlayFileSystem*) runner->fileSystem, resolved);
+    free(resolved);
+    return RValue_makeUndefined();
+}
+
+// FS_set_working_directory(path) - GMS-internal API: overrides the working_directory variable.
+static RValue builtin_FS_set_working_directory(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeUndefined();
+    Runner* runner = ctx->runner;
+    if (runner == nullptr || runner->fileSystem == nullptr) return RValue_makeUndefined();
+    char* raw = RValue_toString(args[0]);
+    char* resolved = fsResolvePlaceholderPath(raw, ctx->dataWin->gen8.name);
+    logWarn("filesystem: FS_set_working_directory raw=\"%s\" resolved=\"%s\"\n", raw, resolved != nullptr ? resolved : "(null)");
+    free(raw);
+    if (resolved == nullptr) {
+        return RValue_makeUndefined();
+    }
+    OverlayFileSystem_setWorkingDirectory((OverlayFileSystem*) runner->fileSystem, resolved);
+    free(resolved);
+    return RValue_makeUndefined();
+}
+
 static RValue builtin_file_exists(VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount) return RValue_makeBool(false);
     const char* path = (args[0].type == RVALUE_STRING ? args[0].string : "");
@@ -8017,8 +8147,19 @@ static RValue builtin_joystick_axes(VMContext* ctx, RValue* args, MAYBE_UNUSED i
 }
 
 // Window stubs
-STUB_RETURN_ZERO(window_get_fullscreen)
-STUB_RETURN_UNDEFINED(window_set_fullscreen)
+static RValue builtin_window_get_fullscreen(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = ctx->runner;
+    if (runner == nullptr || runner->getFullscreen == nullptr) return RValue_makeReal(0.0);
+    return RValue_makeReal(runner->getFullscreen() ? 1.0 : 0.0);
+}
+
+static RValue builtin_window_set_fullscreen(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    if (argCount < 1) return RValue_makeUndefined();
+    Runner* runner = ctx->runner;
+    if (runner == nullptr || runner->setFullscreen == nullptr) return RValue_makeUndefined();
+    runner->setFullscreen(RValue_toBool(args[0]));
+    return RValue_makeUndefined();
+}
 static RValue builtin_window_get_width(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = ctx->runner;
     if (runner != nullptr && runner->getWindowSize != nullptr) {
@@ -17349,6 +17490,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
 
     // Core output
     VM_registerBuiltin(ctx, "show_debug_message", builtin_show_debug_message);
+    VM_registerBuiltin(ctx, "show_error", builtin_show_error);
 
     // String functions
     VM_registerBuiltin(ctx, "string_length", builtin_string_length);
@@ -17609,6 +17751,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "ds_list_write", builtin_ds_list_write);
     VM_registerBuiltin(ctx, "ds_list_read", builtin_ds_list_read);
     VM_registerBuiltin(ctx, "ds_list_replace", builtin_ds_list_replace);
+    VM_registerBuiltin(ctx, "ds_list_set", builtin_ds_list_replace); // alias in GMS1.4
     VM_registerBuiltin(ctx, "ds_list_copy", builtin_ds_list_copy);
 
     // ds_grid
@@ -17688,6 +17831,9 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "steam_file_write", builtin_steam_file_write);
     VM_registerBuiltin(ctx, "steam_file_read", builtin_steam_file_read);
     VM_registerBuiltin(ctx, "steam_get_persona_name", builtin_steam_get_persona_name);
+    VM_registerBuiltin(ctx, "steam_get_achievement", builtin_steam_get_achievement);
+    VM_registerBuiltin(ctx, "steam_set_achievement", builtin_steam_set_achievement);
+    VM_registerBuiltin(ctx, "steam_send_screenshot", builtin_steam_send_screenshot);
 
     // Audio
     VM_registerBuiltin(ctx, "audio_system_is_available", builtin_audio_system_is_available);
@@ -17773,6 +17919,8 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     // Directory
     VM_registerBuiltin(ctx, "directory_exists", builtin_directory_exists);
     VM_registerBuiltin(ctx, "directory_create", builtin_directory_create);
+    VM_registerBuiltin(ctx, "FS_set_gm_save_area", builtin_FS_set_gm_save_area);
+    VM_registerBuiltin(ctx, "FS_set_working_directory", builtin_FS_set_working_directory);
     VM_registerBuiltin(ctx, "directory_destroy", builtin_directory_destroy);
 
     // File

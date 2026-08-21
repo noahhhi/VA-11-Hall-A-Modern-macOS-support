@@ -134,6 +134,16 @@ void platformSetWindowSize(int32_t width, int32_t height) {
         scr = SDL_GetWindowSurface(window);
 }
 
+void platformSetFullscreen(bool fullscreen) {
+    if (window == NULL) return;
+    SDL_SetWindowFullscreen(window, fullscreen);
+}
+
+bool platformGetFullscreen(void) {
+    if (window == NULL) return false;
+    return (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
 void platformGetMousePos(double *xPos, double *yPos) {
     if (!xPos || !yPos) return;
     float mx = 0, my = 0;
