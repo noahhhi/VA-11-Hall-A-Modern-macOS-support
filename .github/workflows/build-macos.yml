@@ -26,12 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Get commit info
-        id: commit-info
-        run: |
-          echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "date=$(git log -1 --format=%cd --date=short)" >> $GITHUB_OUTPUT
-
       - name: Install dependencies
         run: brew install ccache ninja
         env:
@@ -58,23 +52,51 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: Package release archive
+      - name: Upload raw binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: butterscotch-${{ matrix.label }}
+          path: build/butterscotch
+
+  package-universal:
+    name: Package universal release
+    needs: build-appkit-macos
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download arm64 binary
+        uses: actions/download-artifact@v7
+        with:
+          name: butterscotch-arm64
+          path: bin-arm64
+
+      - name: Download x86_64 binary
+        uses: actions/download-artifact@v7
+        with:
+          name: butterscotch-x86_64
+          path: bin-x86_64
+
+      - name: Create universal binary and package
         run: |
           set -e
-          pkg="VA-11-Hall-A-64bit-${{ matrix.label }}"
+          pkg="VA-11-Hall-A-64bit-universal"
+          lipo -create bin-arm64/butterscotch bin-x86_64/butterscotch -output butterscotch
+          lipo -info butterscotch
           mkdir -p "pkg/$pkg"
-          cp build/butterscotch install.sh uninstall.sh README.md README.zh-CN.md LICENSE "pkg/$pkg/"
-          chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh"
+          cp butterscotch install.sh uninstall.sh README.md README.zh-CN.md LICENSE "pkg/$pkg/"
+          cp "Install VA-11 Hall-A 64bit.command" "pkg/$pkg/"
+          chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh" "pkg/$pkg/Install VA-11 Hall-A 64bit.command"
           cd pkg && zip -r "$pkg.zip" "$pkg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: VA-11-Hall-A-64bit-${{ matrix.label }}
-          path: pkg/VA-11-Hall-A-64bit-${{ matrix.label }}.zip
+          name: VA-11-Hall-A-64bit-universal
+          path: pkg/VA-11-Hall-A-64bit-universal.zip
 
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
-        run: gh release upload "${GITHUB_REF_NAME}" "pkg/VA-11-Hall-A-64bit-${{ matrix.label }}.zip" --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" "pkg/VA-11-Hall-A-64bit-universal.zip" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

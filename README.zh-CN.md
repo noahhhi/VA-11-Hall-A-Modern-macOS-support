@@ -20,22 +20,24 @@
 
 ## 安装
 
-1. 从 [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) 下载对应架构的压缩包：
-   - Apple Silicon 选 `VA-11-Hall-A-64bit-arm64.zip`
-   - Intel 选 `VA-11-Hall-A-64bit-x86_64.zip`
-2. 解压后运行：
+1. 从 [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) 下载 `VA-11-Hall-A-64bit-universal.zip`。一个包适配所有 Mac——runner 是 universal 二进制，macOS 会自动选择 arm64（Apple Silicon）或 x86_64（Intel）切片。
+2. 解压后二选一：
+   - **双击** `Install VA-11 Hall-A 64bit.command`（如被 macOS 拦截，右键 → 打开），或
+   - 在终端运行：
 
 ```sh
-cd VA-11-Hall-A-64bit-*
+cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
+
+安装器会自动找到游戏：它扫描所有 Steam 库目录（包括外置硬盘），无需任何参数，也无需安装开发组件——用到的工具均为 macOS 自带。
 
 3. 照常从 Steam 启动游戏，现在它以原生 64 位运行。
 
 > [!IMPORTANT]
 > runner 使用 ad-hoc 签名（由 `install.sh` 在你本机完成重签）。如果 macOS 阻止首次启动，打开 **系统设置 → 隐私与安全性**，点击 **仍要打开**。无需关闭 Gatekeeper 或降低系统安全性。
 
-如果你的 Steam 库不在默认位置，可以把 app 路径作为第一个参数传给 `install.sh`。
+如果自动定位失败（极为少见的安装位置），把游戏 app 拖到 `install.sh` 上，或手动传路径：`./install.sh "/路径/VA-11 Hall-A Cyberpunk Bartender Action.app"`。
 
 ## 存档与 Steam 云同步
 

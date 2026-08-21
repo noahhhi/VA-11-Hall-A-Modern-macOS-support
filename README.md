@@ -20,22 +20,24 @@ Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of V
 
 ## Install
 
-1. Download the archive for your Mac from [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases):
-   - `VA-11-Hall-A-64bit-arm64.zip` for Apple Silicon
-   - `VA-11-Hall-A-64bit-x86_64.zip` for Intel
-2. Extract it, then run:
+1. Download `VA-11-Hall-A-64bit-universal.zip` from [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases). One package fits every Mac — the runner is a universal binary, and macOS automatically picks the arm64 (Apple Silicon) or x86_64 (Intel) slice.
+2. Extract it, then either:
+   - **Double-click** `Install VA-11 Hall-A 64bit.command` (if macOS blocks it, right-click → Open), or
+   - run in Terminal:
 
 ```sh
-cd VA-11-Hall-A-64bit-*
+cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
+
+The installer finds the game on its own: it scans every Steam library folder (including external drives) for the app — no arguments, no developer tools, everything it uses ships with macOS.
 
 3. Launch the game from Steam as usual. It now runs natively in 64-bit.
 
 > [!IMPORTANT]
 > The runner is ad-hoc signed (re-signed on your machine by `install.sh`). If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. You do not need to disable Gatekeeper or reduce system security.
 
-`install.sh` accepts a custom app path as its first argument if your Steam library lives elsewhere.
+If auto-detection fails (a very unusual install location), drag the game app onto `install.sh`, or pass the path yourself: `./install.sh "/path/to/VA-11 Hall-A Cyberpunk Bartender Action.app"`.
 
 ## Saves and Steam Cloud
 
