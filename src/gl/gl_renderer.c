@@ -439,6 +439,18 @@ static void glInit(Renderer* renderer, DataWin* dataWin) {
     gl->isGL3 = (ver.major >= 3);
     gl->isGLES = ver.isGLES;
 
+    // Final-present scale filtering: auto keeps crisp nearest-neighbor at integer ratios and switches
+    // to sharp-bilinear (integer nearest prescale + linear composite) at non-integer ratios.
+    gl->sharpSurfaceId = -1;
+    gl->sharpScaleN = 0;
+    gl->scaleFilter = 0;
+    const char* scaleFilterEnv = getenv("BUTTERSCOTCH_SCALE_FILTER");
+    if (scaleFilterEnv != nullptr) {
+        if (strcmp(scaleFilterEnv, "nearest") == 0) gl->scaleFilter = 1;
+        else if (strcmp(scaleFilterEnv, "linear") == 0) gl->scaleFilter = 2;
+        else if (strcmp(scaleFilterEnv, "sharp") == 0) gl->scaleFilter = 3;
+    }
+
 #if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !defined(PLATFORM_VITA)
     gl_init_wrappers();
 #endif
@@ -975,6 +987,9 @@ static void glEndGUI(Renderer* renderer) {
     glDisable(GL_SCISSOR_TEST);
 }
 
+static int32_t glCreateSurface(Renderer* renderer, int32_t width, int32_t height);
+static void glSurfaceFree(Renderer* renderer, int32_t surfaceID);
+
 static void glEndFrameInit(Renderer* renderer) {
     GLRenderer* gl = (GLRenderer*) renderer;
     if (hasVAO()) glBindVertexArray(0);
@@ -993,33 +1008,83 @@ static void glEndFrameEnd(Renderer* renderer) {
     }
     int32_t appId = gl->base.runner->applicationSurfaceId;
 
+    int32_t sx, sy, ex, ey;
+    GLCommon_computeLetterbox(gl->gameW, gl->gameH, gl->windowW, gl->windowH, &sx, &sy, &ex, &ey);
+    bool integerScale = (gl->gameW > 0 && gl->gameH > 0)
+        && ((ex - sx) % gl->gameW == 0) && ((ey - sy) % gl->gameH == 0);
+    // auto: stay pixel-perfect (nearest) at integer ratios, use sharp-bilinear at non-integer ratios.
+    bool sharp = (gl->scaleFilter == 3) || (gl->scaleFilter == 0 && !integerScale);
+    bool linear = (gl->scaleFilter == 2);
+    bool appSurfaceValid = appId >= 0 && (uint32_t) appId < gl->surfaceCount && gl->surfaces[appId] != 0;
+
     if (gl->isGL3) {
         GLCommon_beginLetterboxBlit(gl->surfaces[appId], gl->hostFramebuffer);
-        GLCommon_endLetterboxBlit(gl->surfaceWidth[appId], gl->surfaceHeight[appId], gl->gameW, gl->gameH, gl->windowW, gl->windowH, gl->hostFramebuffer);
-    } else {
-        glBindFramebuffer(GL_FRAMEBUFFER, gl->hostFramebuffer);
-        GLboolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
-        if (scissorWasEnabled) glDisable(GL_SCISSOR_TEST);
-
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glViewport(0, 0, gl->windowW, gl->windowH);
-
-        renderer->vtable->setGuiProjection(renderer, gl->windowW, gl->windowH, gl->windowW, gl->windowH, false);
-        glDisable(GL_BLEND);
-
-        int32_t sx, sy, ex, ey;
-        GLCommon_computeLetterbox(gl->gameW, gl->gameH, gl->windowW, gl->windowH, &sx, &sy, &ex, &ey);
-        float scaleX = (float)(ex - sx) / (float)gl->gameW;
-        float scaleY = (float)(ey - sy) / (float)gl->gameH;
-
-        renderer->vtable->drawSurface(renderer, appId, 0, 0, gl->gameW, gl->gameH, (float)sx, (float)sy, scaleX, scaleY, 0.0f, 0xFFFFFF, 1.0f);
-        flushBatch(gl);
-
-        glEnable(GL_BLEND);
-        if (scissorWasEnabled) glEnable(GL_SCISSOR_TEST);
+        GLCommon_endLetterboxBlit(gl->surfaceWidth[appId], gl->surfaceHeight[appId], gl->gameW, gl->gameH, gl->windowW, gl->windowH, gl->hostFramebuffer, (sharp || linear) ? GL_LINEAR : GL_NEAREST);
+        return;
     }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, gl->hostFramebuffer);
+    GLboolean scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
+    if (scissorWasEnabled) glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_BLEND);
+
+    int32_t presentId = appId;
+    int32_t srcW = gl->gameW;
+    int32_t srcH = gl->gameH;
+
+    if (sharp && appSurfaceValid) {
+        // Sharp-bilinear, stage 1: integer nearest-neighbor prescale into an intermediate surface.
+        int32_t n = (ex - sx + gl->gameW - 1) / gl->gameW; // ceil of the final ratio
+        if (n < 1) n = 1;
+        if (n > 16) n = 16;
+        int32_t sharpW = gl->gameW * n;
+        int32_t sharpH = gl->gameH * n;
+        if (gl->sharpSurfaceId < 0 || gl->sharpScaleN != n
+            || (uint32_t) gl->sharpSurfaceId >= gl->surfaceCount || gl->surfaces[gl->sharpSurfaceId] == 0) {
+            if (gl->sharpSurfaceId >= 0 && (uint32_t) gl->sharpSurfaceId < gl->surfaceCount && gl->surfaces[gl->sharpSurfaceId] != 0) {
+                glSurfaceFree(renderer, gl->sharpSurfaceId);
+            }
+            gl->sharpSurfaceId = glCreateSurface(renderer, sharpW, sharpH);
+            gl->sharpScaleN = n;
+            // The intermediate is only ever sampled by the stage-2 composite below; keep it linear.
+            glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[gl->sharpSurfaceId]);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[gl->sharpSurfaceId]);
+        glViewport(0, 0, sharpW, sharpH);
+        renderer->vtable->setGuiProjection(renderer, sharpW, sharpH, sharpW, sharpH, true);
+        renderer->vtable->drawSurface(renderer, appId, 0, 0, gl->gameW, gl->gameH, 0.0f, 0.0f, (float) n, (float) n, 0.0f, 0xFFFFFF, 1.0f);
+        flushBatch(gl);
+        glBindFramebuffer(GL_FRAMEBUFFER, gl->hostFramebuffer);
+
+        presentId = gl->sharpSurfaceId;
+        srcW = sharpW;
+        srcH = sharpH;
+    }
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glViewport(0, 0, gl->windowW, gl->windowH);
+
+    renderer->vtable->setGuiProjection(renderer, gl->windowW, gl->windowH, gl->windowW, gl->windowH, false);
+
+    float scaleX = (float)(ex - sx) / (float) srcW;
+    float scaleY = (float)(ey - sy) / (float) srcH;
+
+    if (linear) {
+        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+    renderer->vtable->drawSurface(renderer, presentId, 0, 0, srcW, srcH, (float)sx, (float)sy, scaleX, scaleY, 0.0f, 0xFFFFFF, 1.0f);
+    flushBatch(gl);
+    if (linear) {
+        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+
+    glEnable(GL_BLEND);
+    if (scissorWasEnabled) glEnable(GL_SCISSOR_TEST);
 }
 
 static void glRendererFlush(Renderer* renderer) {

@@ -102,6 +102,12 @@ typedef struct {
     bool isGL3; // TRUE if running on OpenGL (ES) 3.x+
     bool isGLES;  // TRUE if running on OpenGL ES (GLES)
 
+    // Final-present scale filtering: 0 = auto (nearest at integer ratios, sharp-bilinear otherwise),
+    // 1 = nearest, 2 = linear, 3 = sharp-bilinear. Parsed once from BUTTERSCOTCH_SCALE_FILTER.
+    int32_t scaleFilter;
+    int32_t sharpSurfaceId; // intermediate integer-prescaled surface used by sharp-bilinear (-1 = none)
+    int32_t sharpScaleN;    // integer factor sharpSurfaceId was created at (0 = none)
+
     // Cached default shader uniforms
     GLShaderUniform* uWorldViewProjection;
     GLShaderUniform* uFogColor;

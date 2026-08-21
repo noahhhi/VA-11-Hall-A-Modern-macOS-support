@@ -63,9 +63,11 @@ The upstream Butterscotch runtime needed VA-11-specific fixes, all included in t
 - `FS_set_gm_save_area` / `FS_set_working_directory` (used by the game's `_gmfilesystem_initialize`) with `%appdata%` placeholder mapping — enables the save behavior described above.
 - Lazy texture loading by default in bundled mode, cutting the GPU memory footprint from ~1.3GB to ~540MB (comparable to the original runner's ~650MB).
 - `ds_list_set` and Steam achievement stubs required by this game.
+- Pixel-perfect present scaling: nearest-neighbor at integer ratios; at non-integer ratios (e.g. fullscreen under a 1440x900 HiDPI desktop) an automatic sharp-bilinear pass (integer nearest prescale + linear composite) keeps pixel stroke widths uniform instead of wobbling. Override with `BUTTERSCOTCH_SCALE_FILTER=nearest|linear|sharp`.
 
 ## Known limitations
 
+- For the sharpest image, prefer the 1280x800 (HiDPI) or native 2560x1600 display modes. In the default 1440x900 (HiDPI) mode macOS renders the whole desktop at 2880x1800 and downsamples it to the 2560x1600 panel, softening every app on screen — no renderer can avoid that system pass.
 - The scanlines toggle label in the settings panel displays "Off" even when enabled. This is a bug in the game's own logic — the original 32-bit runner behaves identically — and is not a regression of this port.
 - Steam achievements are stubbed; gameplay is unaffected.
 - Steam Cloud syncs saves between Macs only. The publisher's AutoCloud config keeps Windows, macOS, and Linux saves in separate namespaces, so saves never travel to or from a Steam Deck / Windows PC. The original game behaves the same way; no runner change can alter it.

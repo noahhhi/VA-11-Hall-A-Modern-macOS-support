@@ -63,9 +63,11 @@ cd VA-11-Hall-A-64bit-universal
 - `FS_set_gm_save_area` / `FS_set_working_directory`（游戏 `_gmfilesystem_initialize` 调用）及 `%appdata%` 占位符映射——实现上文所述的存档行为。
 - 打包模式默认启用纹理懒加载，GPU 内存占用从约 1.3GB 降到约 540MB（与原版 runner 约 650MB 相当）。
 - 补全该游戏需要的 `ds_list_set` 与 Steam 成就 stub。
+- 像素完美上屏缩放：整数倍率保持最近邻；非整数倍率（如在 1440x900 HiDPI 桌面下全屏）自动启用 sharp-bilinear（整数最近邻预放大 + 线性合成），笔画宽度均匀不抖动。可用 `BUTTERSCOTCH_SCALE_FILTER=nearest|linear|sharp` 覆盖。
 
 ## 已知限制
 
+- 想获得最锐利的画面，请使用 1280x800（HiDPI）或原生 2560x1600 显示模式。macOS 默认的 1440x900（HiDPI）模式会先将整个桌面渲染到 2880x1800 再降采样到 2560x1600 面板，屏幕上所有应用都会因此变软——任何渲染器都无法绕过这一系统级处理。
 - 设置面板中扫描线开关的标签恒显示"Off"。这是游戏自身逻辑的 bug——原版 32 位 runner 表现完全相同——并非本移植的回归。
 - Steam 成就为 stub（不影响游玩）。
 - Steam 云存档仅在 Mac 之间同步。发行商的 AutoCloud 配置将 Windows、macOS、Linux 的存档隔离在三个独立命名空间，存档不会与 Steam Deck / Windows PC 互通。原版游戏行为相同，runner 无法改变。
