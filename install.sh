@@ -74,12 +74,26 @@ chmod +x "$APP/Contents/MacOS/butterscotch"
 /usr/libexec/PlistBuddy -c "Set CFBundleExecutable butterscotch" "$APP/Contents/Info.plist"
 echo "installed runner (CFBundleExecutable=butterscotch)"
 
+# Enable Retina/HiDPI rendering: the original Info.plist lacks NSHighResolutionCapable,
+# which forces macOS into magnified 1x mode (blurry). The runner's mouse handling is
+# backing-scale aware, it just needs the window to actually get a 2x backing store.
+/usr/libexec/PlistBuddy -c "Set NSHighResolutionCapable true" "$APP/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add NSHighResolutionCapable bool true" "$APP/Contents/Info.plist"
+echo "enabled NSHighResolutionCapable (Retina rendering)"
+
 # The original Mac_Runner is left in place; uninstall.sh restores the entry point.
 
 # Strip the quarantine flag from the file we just installed (the archive came from
 # a browser download), then ad-hoc re-sign the bundle as macOS requires after edits.
 xattr -d com.apple.quarantine "$APP/Contents/MacOS/butterscotch" 2>/dev/null || true
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1
+# The depot's legacy 32-bit components carry pre-2016 signatures that fail modern strict
+# validation (they are unused by the 64-bit runner); strip them so the bundle can sign.
+find "$APP/Contents" \( -name "*.dylib" -o -name "Mac_Runner" \) -exec codesign --remove-signature {} \; 2>/dev/null || true
+if ! sign_out="$(codesign --force --deep --sign - "$APP" 2>&1)"; then
+    echo "error: ad-hoc re-sign failed:" >&2
+    echo "$sign_out" >&2
+    exit 1
+fi
 echo "re-signed (ad-hoc)"
 
 # Save files live in the Steam AutoCloud directory so Steam Cloud can sync them.
