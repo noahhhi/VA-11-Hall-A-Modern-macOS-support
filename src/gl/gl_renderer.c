@@ -1046,8 +1046,11 @@ static void glEndFrameEnd(Renderer* renderer) {
             }
             gl->sharpSurfaceId = glCreateSurface(renderer, sharpW, sharpH);
             gl->sharpScaleN = n;
-            // The intermediate is only ever sampled by the stage-2 composite below; keep it linear.
+            // The intermediate is only ever sampled by the stage-2 composite below.
+            // Stage 2 always minifies (n = ceil of the final ratio), so GL_LINEAR must be set
+            // on MIN_FILTER; MAG_FILTER alone would leave the minified sample at GL_NEAREST.
             glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[gl->sharpSurfaceId]);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[gl->sharpSurfaceId]);
@@ -1074,12 +1077,14 @@ static void glEndFrameEnd(Renderer* renderer) {
 
     if (linear) {
         glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
     renderer->vtable->drawSurface(renderer, presentId, 0, 0, srcW, srcH, (float)sx, (float)sy, scaleX, scaleY, 0.0f, 0xFFFFFF, 1.0f);
     flushBatch(gl);
     if (linear) {
         glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
 
