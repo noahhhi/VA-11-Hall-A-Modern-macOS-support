@@ -1,0 +1,80 @@
+name: macOS builds
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-appkit-macos:
+    name: Build (AppKit ${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: x86_64
+            runner: macos-26-intel
+          - label: arm64
+            runner: macos-26
+
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Get commit info
+        id: commit-info
+        run: |
+          echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "date=$(git log -1 --format=%cd --date=short)" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: brew install ccache ninja
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-${{ matrix.label }}-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-${{ matrix.label }}-
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DWERROR=ON \
+            -DCMAKE_C_FLAGS="-Wno-deprecated-declarations" \
+            -DBACKEND=appkit \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package release archive
+        run: |
+          set -e
+          pkg="VA-11-Hall-A-64bit-${{ matrix.label }}"
+          mkdir -p "pkg/$pkg"
+          cp build/butterscotch install.sh uninstall.sh README.md README.zh-CN.md LICENSE "pkg/$pkg/"
+          chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh"
+          cd pkg && zip -r "$pkg.zip" "$pkg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: VA-11-Hall-A-64bit-${{ matrix.label }}
+          path: pkg/VA-11-Hall-A-64bit-${{ matrix.label }}.zip
+
+      - name: Upload to release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: gh release upload "${GITHUB_REF_NAME}" "pkg/VA-11-Hall-A-64bit-${{ matrix.label }}.zip" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7340,11 +7340,9 @@ static bool fsPathStartsWith(const char* str, const char* prefix) {
 // POSIX paths, where the stock GML script splits on backslashes only).
 // Returns nullptr when no usable directory name can be determined (caller keeps the current area).
 static char* fsResolvePlaceholderPath(const char* path, const char* fallbackName) {
-    bool local = false;
     const char* rest = nullptr;
     if (fsPathStartsWith(path, "%localappdata%")) {
         rest = path + strlen("%localappdata%");
-        local = true;
     } else if (fsPathStartsWith(path, "%appdata%")) {
         rest = path + strlen("%appdata%");
     }
@@ -7353,6 +7351,7 @@ static char* fsResolvePlaceholderPath(const char* path, const char* fallbackName
     char* owned = nullptr;
     const char* base = nullptr;
 #ifdef _WIN32
+    bool local = fsPathStartsWith(path, "%localappdata%");
     base = getenv(local ? "LOCALAPPDATA" : "APPDATA");
     if (base == nullptr) base = getenv("USERPROFILE");
 #elif defined(__APPLE__)
