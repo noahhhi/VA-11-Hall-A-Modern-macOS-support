@@ -7,11 +7,11 @@
   <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-为 macOS Steam 版《VA-11 Hall-A：赛博朋克酒保行动》提供的原生 64 位 runner，基于开源的 GameMaker Studio 1.4 运行时 [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch) 构建。它替换游戏自带的 32 位 `Mac_Runner`——后者在 macOS 10.15 Catalina 及以后的系统上无法启动。
+为 macOS Steam 版《VA-11 Hall-A：赛博朋克酒保行动》提供的原生 64 位 runner，基于开源的 GameMaker Studio 1.4 runner [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch) 构建。它替换游戏自带的 32 位 `Mac_Runner`——在 macOS 10.15 Catalina 及以后的系统上无法启动。
 
 当前参考测试环境：Apple Silicon Mac，macOS 27.0，Steam 版 VA-11 Hall-A（AppID 447530，`game.ios` 字节码 v15）。启动、调酒、设置面板（音量 / 扫描线 / 全屏）与存档读写均已通过本机测试。
 
-> **预览说明：** 本包只包含兼容性组件。你需要在 Steam 上拥有 VA-11 Hall-A；本仓库不包含也不分发任何游戏数据。
+> **说明：** 安装包只包含修复组件。你需要在 Steam 上拥有 VA-11 Hall-A；本仓库不包含也不分发任何游戏。
 
 ## 系统要求
 
@@ -20,7 +20,7 @@
 
 ## 一键安装
 
-从 [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) 下载 `VA-11-Hall-A-64bit-universal.pkg` 并双击。安装包会扫描所有 Steam 库，安装 arm64/x86_64 通用 runner 与 Valve 官方 Steamworks 运行库，更新 app 入口并重新签名，同时在 app 外保留原版 runner 与签名用于恢复。无需解压，也无需打开终端。
+从 [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) 下载 `VA-11-Hall-A-64bit-universal.pkg` 并双击。安装包会扫描所有 Steam 库，安装 arm64/x86_64 通用 runner 与 Valve 官方 Steamworks 运行库，更新 app 入口并重新签名，同时在 app 外保留原版 runner 与签名用于恢复。
 
 预览构建仍提供 `.command` 备用流程：解压 `VA-11-Hall-A-64bit-universal.zip`，双击 `Install VA-11 Hall-A 64bit.command`，或运行：
 
@@ -29,7 +29,7 @@ cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
 
-安装器会明确报告 macOS 版本不支持、Steam 库缺失、app 包结构异常、组件缺少架构或权限不足等错误，并在失败时自动回滚，避免留下不完整的安装状态。成功后可照常从 Steam 启动游戏。
+安装器会明确报告 macOS 版本不支持、Steam 库缺失、app 包结构异常、组件缺少架构或权限不足等错误，并在安装失败时自动回滚，避免留下错误的安装状态。成功后可照常从 Steam 启动游戏。
 
 > [!IMPORTANT]
 > runner 使用 ad-hoc 签名（由 `install.sh` 在你本机完成重签）。如果 macOS 阻止首次启动，打开 **系统设置 → 隐私与安全性**，点击 **仍要打开**。无需关闭 Gatekeeper，也无需降低系统安全性。
@@ -38,7 +38,7 @@ cd VA-11-Hall-A-64bit-universal
 
 ## 存档与 Steam 云同步
 
-存档格式与原版兼容，写入 `~/Library/Application Support/VA_11_Hall_A/saves/`。安装器只迁移目标目录中尚不存在的旧存档，不会覆盖已有进度；从 Steam 启动时，由游戏发行商配置的 AutoCloud 负责上传与下载。
+存档格式与原版兼容，写入 `~/Library/Application Support/VA_11_Hall_A/saves/`。安装器只会迁移目标目录中尚不存在的旧存档，不会覆盖已有进度；从 Steam 启动时，由游戏发行商配置的 AutoCloud 负责上传与下载。
 
 ## 卸载
 

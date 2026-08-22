@@ -7,11 +7,11 @@
   <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-A native 64-bit runner for the macOS Steam release of *VA-11 Hall-A: Cyberpunk Bartender Action*, built on the open-source [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch) GameMaker Studio 1.4 runtime. It replaces the game's original 32-bit `Mac_Runner`, which no longer launches on macOS 10.15 Catalina or later.
+A native 64-bit runner for the macOS Steam release of *VA-11 Hall-A: Cyberpunk Bartender Action*, built on the open-source GameMaker Studio 1.4 runner [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch). It replaces the game's original 32-bit `Mac_Runner`, which cannot launch on macOS 10.15 Catalina or later.
 
 Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of VA-11 Hall-A (AppID 447530, `game.ios` bytecode v15). Boot, bartending, the settings panel (volume / scanlines / fullscreen), and save files are covered by local testing.
 
-> **Preview:** This package contains compatibility components only. You must own VA-11 Hall-A on Steam; no game data is included or distributed.
+> **Note:** The installer contains fixes only. You must own VA-11 Hall-A on Steam; this repository does not include or distribute the game.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of V
 
 ## One-click install
 
-Download `VA-11-Hall-A-64bit-universal.pkg` from [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) and double-click it. The package searches every configured Steam library, installs the universal arm64/x86_64 runner and Valve's official Steamworks runtime, updates the app entry point, and re-signs the bundle. A restorable copy of the original runner and signature is kept outside the app. No extraction or Terminal commands are required.
+Download `VA-11-Hall-A-64bit-universal.pkg` from [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) and double-click it. The package searches every configured Steam library, installs the universal arm64/x86_64 runner and Valve's official Steamworks runtime, updates the app entry point, and re-signs the bundle. A restorable copy of the original runner and signature is kept outside the app.
 
 The `.command` installer remains as a portable fallback for preview builds: extract `VA-11-Hall-A-64bit-universal.zip`, then double-click `Install VA-11 Hall-A 64bit.command`, or run:
 
@@ -29,7 +29,7 @@ cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
 
-The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing component architectures, and permission failures. A failed installation is rolled back automatically instead of leaving a partial state. Launch the game from Steam as usual after it succeeds.
+The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing component architectures, and permission failures. If installation fails, it rolls back automatically instead of leaving the app in an invalid state. Launch the game from Steam as usual after it succeeds.
 
 > [!IMPORTANT]
 > The runner is ad-hoc signed (re-signed on your machine by `install.sh`). If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. You do not need to disable Gatekeeper or reduce system security.
@@ -38,7 +38,7 @@ If auto-detection fails because the game is installed in an unusual location, pa
 
 ## Saves and Steam Cloud
 
-Save files remain compatible with the original game and are written to `~/Library/Application Support/VA_11_Hall_A/saves/`. The installer migrates only old saves that are missing from that destination, so existing progress is never overwritten. When the game is launched through Steam, the publisher's AutoCloud configuration handles uploads and downloads.
+Save files remain compatible with the original game and are written to `~/Library/Application Support/VA_11_Hall_A/saves/`. The installer only migrates old saves that are missing from that destination, so existing progress is never overwritten. When the game is launched through Steam, the publisher's AutoCloud configuration handles uploads and downloads.
 
 ## Uninstall
 
