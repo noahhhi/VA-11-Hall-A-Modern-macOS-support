@@ -29,6 +29,8 @@ cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
 
+Both files are intentional: `install.sh` contains the actual installer used by Terminal, automation, and the PKG; the small `.command` wrapper makes it double-clickable in Finder and keeps the Terminal window open so the result remains visible. They automatically use Chinese when Chinese is the current user's preferred macOS language, otherwise English. The scripts also display the detected physical processor architecture before changing the game.
+
 The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing binary architectures, and permission failures without leaving a half-installed runner. Launch the game from Steam as usual after it succeeds.
 
 ### Architecture selection

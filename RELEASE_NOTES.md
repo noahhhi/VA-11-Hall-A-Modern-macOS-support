@@ -4,7 +4,11 @@
 
 The runner contains both `arm64` and `x86_64`. macOS selects the native slice automatically. On Apple Silicon, quit the game and use Finder **Get Info → Open using Rosetta** to test `x86_64`; disable it to return to native `arm64`. Native mode is recommended.
 
+`install.sh`, the Finder-double-clickable `.command` launcher, and `uninstall.sh` automatically use Chinese or English from the current user's preferred macOS language and clearly display the detected physical processor architecture.
+
 Runner 同时包含 `arm64` 与 `x86_64`。macOS 默认自动选择原生架构。在 Apple Silicon 上，如需测试 `x86_64`，退出游戏后在 Finder 的 **显示简介 → 使用 Rosetta 打开** 中切换；取消勾选恢复原生 `arm64`。日常使用推荐原生模式。
+
+`install.sh`、Finder 双击用的 `.command` 启动器以及 `uninstall.sh` 会根据当前用户的 macOS 首选语言自动显示中文或英文，并明确显示检测到的物理处理器架构。
 
 ## Uninstall / 卸载
 
