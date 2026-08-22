@@ -49,7 +49,7 @@ Save files are written to `~/Library/Application Support/VA_11_Hall_A/saves/` â€
 
 ## Uninstall
 
-Download the standalone `uninstall.sh` asset from the same GitHub Release, then run:
+`uninstall.sh` is included in the Release ZIP and is also available as a standalone Release asset. Run it from the extracted ZIP, or download it separately and run:
 
 ```sh
 bash ~/Downloads/uninstall.sh

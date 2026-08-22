@@ -8,6 +8,6 @@ Runner 同时包含 `arm64` 与 `x86_64`。macOS 默认自动选择原生架构�
 
 ## Uninstall / 卸载
 
-Download `uninstall.sh` as a standalone asset from the GitHub Release and run it with `bash ~/Downloads/uninstall.sh`. It restores the preserved Steam runner and signature while leaving saves untouched.
+The Release ZIP includes `uninstall.sh`, and the GitHub Release also provides it as a standalone asset. Run it with `bash ~/Downloads/uninstall.sh`. It restores the preserved Steam runner and signature while leaving saves untouched.
 
-从 GitHub Release 单独下载 `uninstall.sh`，运行 `bash ~/Downloads/uninstall.sh`。脚本恢复留存的 Steam runner 与签名，不删除存档。
+Release ZIP 中包含 `uninstall.sh`，GitHub Release 同时提供独立脚本资产。运行 `bash ~/Downloads/uninstall.sh` 即可恢复留存的 Steam runner 与签名，且不会删除存档。

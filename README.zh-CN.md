@@ -49,7 +49,7 @@ Release 中的 runner 是 Universal 二进制。macOS 会在 Apple Silicon 上�
 
 ## 卸载
 
-从同一 GitHub Release 单独下载 `uninstall.sh`，然后运行：
+Release ZIP 中包含 `uninstall.sh`，同时也提供独立的 Release 资产。从 ZIP 解压目录运行，或单独下载后运行：
 
 ```sh
 bash ~/Downloads/uninstall.sh
