@@ -3,6 +3,7 @@
 #include "data_win.h"
 #include "vm.h"
 #include "loop.h"
+#include "steam_bridge.h"
 
 #include "platformdefs.h"
 #include "stdio_compat.h"
@@ -913,6 +914,10 @@ int loop(CommandLineArgs args, const char *argv0) {
         Runner_setGameArgs(runner, currentGameArgs, (int32_t) arrlen(currentGameArgs));
         platformInitFunctions(runner);
 
+        // Steam's user stats interface must exist before Game Start/Create
+        // events query steam_initialised() or attempt to unlock achievements.
+        SteamBridge_init();
+
         // GMS1.4 GEN8 InfoFlags: bit 0x20 = ShowCursor. Games that draw their own
         // cursor (e.g. VA-11) clear this bit, and the original runner then hides the
         // system cursor for the whole session. Mirror that behaviour.
@@ -1003,6 +1008,8 @@ int loop(CommandLineArgs args, const char *argv0) {
                 shouldWindowClose = true;
                 continue;
             }
+
+            SteamBridge_runCallbacks();
 
             // Debug key bindings
             if (runner->debugMode) {
@@ -1336,6 +1343,7 @@ int loop(CommandLineArgs args, const char *argv0) {
 
         // Keep the window + GL context alive across game_change so we don't spawn a new window
         if (actuallyShuttingDown) {
+            SteamBridge_shutdown();
             platformExit();
             platformInitialized = false;
         }

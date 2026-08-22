@@ -91,9 +91,10 @@ jobs:
           packaging/build-pkg.sh "$version" dist-bin/butterscotch-universal
           mkdir -p "pkg/$pkg"
           cp dist-bin/butterscotch-universal "pkg/$pkg/butterscotch"
+          cp vendor/steamworks/redistributable_bin/osx/libsteam_api.dylib "pkg/$pkg/libsteam_api.dylib"
           cp install.sh uninstall.sh README.md README.zh-CN.md RELEASE_NOTES.md LICENSE "pkg/$pkg/"
           cp "Install VA-11 Hall-A 64bit.command" "pkg/$pkg/"
-          chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh" "pkg/$pkg/Install VA-11 Hall-A 64bit.command"
+          chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/libsteam_api.dylib" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh" "pkg/$pkg/Install VA-11 Hall-A 64bit.command"
           cd pkg && zip -r "$pkg.zip" "$pkg"
 
       - name: Upload artifact

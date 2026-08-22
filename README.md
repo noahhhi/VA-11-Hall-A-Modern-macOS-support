@@ -9,9 +9,9 @@
 
 A native 64-bit runner for the macOS Steam release of *VA-11 Hall-A: Cyberpunk Bartender Action*, built on the open-source [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch) GameMaker Studio 1.4 runtime. It replaces the game's original 32-bit `Mac_Runner`, which no longer launches on macOS 10.15 Catalina or later.
 
-Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of VA-11 Hall-A (AppID 447530, `game.ios` bytecode v15). Boot, language select, main menu, settings panel (volume / scanlines / fullscreen), and save files are covered by local testing.
+Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of VA-11 Hall-A (AppID 447530, `game.ios` bytecode v15). Boot, bartending, the settings panel (volume / scanlines / fullscreen), and save files are covered by local testing.
 
-> **Preview:** This package contains only the replacement runner. You must own VA-11 Hall-A on Steam; no game data is included or distributed.
+> **Preview:** This package contains compatibility components only. You must own VA-11 Hall-A on Steam; no game data is included or distributed.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of V
 
 ## One-click install
 
-Download `VA-11-Hall-A-64bit-universal.pkg` from [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) and double-click it. The package finds VA-11 Hall-A in all configured Steam libraries, installs the universal arm64/x86_64 runner, preserves a restorable copy of the original runner and signature, repairs the app signature, and migrates only missing saves. No extraction or Terminal commands are required.
+Download `VA-11-Hall-A-64bit-universal.pkg` from [GitHub Releases](https://github.com/noahhhi/VA-11-Hall-A-64bit/releases) and double-click it. The package searches every configured Steam library, installs the universal arm64/x86_64 runner and Valve's official Steamworks runtime, updates the app entry point, and re-signs the bundle. A restorable copy of the original runner and signature is kept outside the app. No extraction or Terminal commands are required.
 
 The `.command` installer remains as a portable fallback for preview builds: extract `VA-11-Hall-A-64bit-universal.zip`, then double-click `Install VA-11 Hall-A 64bit.command`, or run:
 
@@ -29,25 +29,16 @@ cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
 
-Both files are intentional: `install.sh` contains the actual installer used by Terminal, automation, and the PKG; the small `.command` wrapper makes it double-clickable in Finder and keeps the Terminal window open so the result remains visible. They automatically use Chinese when Chinese is the current user's preferred macOS language, otherwise English. The scripts also display the detected physical processor architecture before changing the game.
-
-The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing binary architectures, and permission failures without leaving a half-installed runner. Launch the game from Steam as usual after it succeeds.
-
-### Architecture selection
-
-The Release runner is Universal. macOS automatically uses `arm64` on Apple Silicon and `x86_64` on Intel. On Apple Silicon, you can manually test the Intel slice by quitting the game, selecting the game app in Finder, choosing **File → Get Info**, and enabling **Open using Rosetta**. Disable that option to return to native arm64. Native arm64 is recommended for normal play.
+The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing component architectures, and permission failures. A failed installation is rolled back automatically instead of leaving a partial state. Launch the game from Steam as usual after it succeeds.
 
 > [!IMPORTANT]
 > The runner is ad-hoc signed (re-signed on your machine by `install.sh`). If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. You do not need to disable Gatekeeper or reduce system security.
 
-If auto-detection fails (a very unusual install location), drag the game app onto `install.sh`, or pass the path yourself: `./install.sh "/path/to/VA-11 Hall-A Cyberpunk Bartender Action.app"`.
+If auto-detection fails because the game is installed in an unusual location, pass its path in Terminal: `./install.sh "/path/to/VA-11 Hall-A Cyberpunk Bartender Action.app"`.
 
 ## Saves and Steam Cloud
 
-Save files are written to `~/Library/Application Support/VA_11_Hall_A/saves/` — the directory the game's Steam AutoCloud configuration actually monitors. The original 32-bit runner never used it (it wrote inside the app bundle instead, so Steam Cloud never synced anything). This runner implements the game's `FS_set_gm_save_area` / `FS_set_working_directory` calls, so saves land where Steam expects them:
-
-- Existing saves inside the app bundle are migrated automatically by `install.sh`.
-- Launching the game through Steam uploads/downloads this directory as configured by the publisher.
+Save files remain compatible with the original game and are written to `~/Library/Application Support/VA_11_Hall_A/saves/`. The installer migrates only old saves that are missing from that destination, so existing progress is never overwritten. When the game is launched through Steam, the publisher's AutoCloud configuration handles uploads and downloads.
 
 ## Uninstall
 
@@ -66,14 +57,12 @@ The upstream Butterscotch runtime needed VA-11-specific fixes, all included in t
 - GMS1.4 automatic sprite bounding boxes (`bboxMode=0`) computed from texture alpha — fixes broken menu hitboxes (volume buttons, sliders) and click crosstalk.
 - `FS_set_gm_save_area` / `FS_set_working_directory` (used by the game's `_gmfilesystem_initialize`) with `%appdata%` placeholder mapping — enables the save behavior described above.
 - Lazy texture loading by default in bundled mode, cutting the GPU memory footprint from ~1.3GB to ~540MB (comparable to the original runner's ~650MB).
-- `ds_list_set` and Steam achievement stubs required by this game.
+- Achievement reads and unlocks through Valve's official Steamworks API, with Steam callbacks processed every frame.
 
 ## Known limitations
 
-- The scanlines toggle label in the settings panel displays "Off" even when enabled. This is a bug in the game's own logic — the original 32-bit runner behaves identically — and is not a regression of this port.
-- Steam achievements are stubbed; gameplay is unaffected.
-- Steam Cloud syncs saves between Macs only. The publisher's AutoCloud config keeps Windows, macOS, and Linux saves in separate namespaces, so saves never travel to or from a Steam Deck / Windows PC. The original game behaves the same way; no runner change can alter it.
-- Testing cloud sync on a single machine looks like "nothing changed": the cloud copy was uploaded from this machine, so downloading restores identical files. To see it work, delete a file in `~/Library/Application Support/VA_11_Hall_A/saves/` and relaunch — Steam restores it before the game starts.
+- The scanlines toggle label in the settings panel always displays "Off". This is a bug in the game's own logic.
+- Steam Cloud syncs directly between Macs only. The publisher's AutoCloud configuration places Windows, macOS, and Linux saves in separate namespaces, so they do not sync across platforms automatically. Use Steam's cloud-file page for manual transfer when needed.
 
 ## Building from source
 
@@ -89,4 +78,4 @@ See [README.upstream.md](README.upstream.md) for the full Butterscotch build doc
 
 ## License and credits
 
-This project is a modified build of [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch), licensed under the [GNU Affero General Public License v3](LICENSE), which this distribution retains. *VA-11 Hall-A* is a game by Sukeban Games; this project is an unofficial compatibility effort and distributes no game assets.
+This project is a modified build of [Butterscotch](https://github.com/ButterscotchRunner/Butterscotch), licensed under the [GNU Affero General Public License v3](LICENSE), which this distribution retains. *VA-11 Hall-A* is a game by Sukeban Games; the Steamworks runtime is provided by Valve. This is an unofficial compatibility tool and distributes no game assets.

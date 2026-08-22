@@ -6,6 +6,7 @@ set -euo pipefail
 APP_NAME="VA-11 Hall-A Cyberpunk Bartender Action.app"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER_SOURCE="$SCRIPT_DIR/butterscotch"
+STEAM_API_SOURCE="$SCRIPT_DIR/libsteam_api.dylib"
 TARGET_HOME="${VA11_TARGET_HOME:-$HOME}"
 MIN_MACOS_MAJOR=11
 
@@ -103,6 +104,7 @@ fi
 [ -f "$APP/Contents/Info.plist" ] || fail "Info.plist is missing from the selected app" "所选 app 中缺少 Info.plist"
 [ -f "$APP/Contents/Resources/game.ios" ] || fail "game.ios is missing; select the Steam release of VA-11 Hall-A" "缺少 game.ios；请选择 Steam 版 VA-11 Hall-A"
 [ -f "$RUNNER_SOURCE" ] || fail "butterscotch is missing next to install.sh; download the complete package" "install.sh 旁缺少 butterscotch；请下载完整发布包"
+[ -f "$STEAM_API_SOURCE" ] || fail "the official Steamworks runtime is missing next to install.sh; download the complete package" "install.sh 旁缺少官方 Steamworks 运行库；请下载完整发布包"
 
 msg "Target: $APP" "目标：$APP"
 
@@ -110,6 +112,15 @@ RUNNER_ARCHS="$(lipo -archs "$RUNNER_SOURCE" 2>/dev/null || true)"
 case " $RUNNER_ARCHS " in *" arm64 "*) ;; *) fail "bundled runner is missing the arm64 slice" "随附 runner 缺少 arm64 切片" ;; esac
 case " $RUNNER_ARCHS " in *" x86_64 "*) ;; *) fail "bundled runner is missing the x86_64 slice" "随附 runner 缺少 x86_64 切片" ;; esac
 msg "Runner architectures: $RUNNER_ARCHS" "Runner 架构：$RUNNER_ARCHS"
+
+STEAM_API_ARCHS="$(lipo -archs "$STEAM_API_SOURCE" 2>/dev/null || true)"
+case " $STEAM_API_ARCHS " in *" arm64 "*) ;; *) fail "Steamworks runtime is missing the arm64 slice" "Steamworks 运行库缺少 arm64 切片" ;; esac
+case " $STEAM_API_ARCHS " in *" x86_64 "*) ;; *) fail "Steamworks runtime is missing the x86_64 slice" "Steamworks 运行库缺少 x86_64 切片" ;; esac
+for symbol in SteamAPI_InitFlat SteamAPI_RunCallbacks SteamAPI_SteamUserStats_v013 SteamAPI_ISteamUserStats_SetAchievement SteamAPI_ISteamUserStats_StoreStats; do
+    nm -gU "$STEAM_API_SOURCE" 2>/dev/null | grep " _$symbol$" >/dev/null \
+        || fail "Steamworks runtime is missing required symbol: $symbol" "Steamworks 运行库缺少必要接口：$symbol"
+done
+msg "Steamworks architectures: $STEAM_API_ARCHS" "Steamworks 架构：$STEAM_API_ARCHS"
 
 # A normal Steam library is user-writable. Protected or external libraries get
 # one standard macOS administrator dialog; no credential is stored or logged.
@@ -162,6 +173,9 @@ restore_transaction() {
             cp -p "$saved" "$destination"
         done < <(find "$TXN_DIR/code" -type f -print0)
     fi
+    if [ -f "$TXN_DIR/steam-api-was-absent" ]; then
+        rm -f "$APP/Contents/MacOS/libsteam_api.dylib"
+    fi
     if [ -d "$TXN_DIR/_CodeSignature" ]; then
         rm -rf "$APP/Contents/_CodeSignature"
         cp -Rp "$TXN_DIR/_CodeSignature" "$APP/Contents/_CodeSignature"
@@ -191,6 +205,9 @@ if [ -f "$APP/Contents/Info.plist.va11-orig" ]; then
 fi
 if [ -f "$APP/Contents/MacOS/butterscotch" ]; then
     cp -p "$APP/Contents/MacOS/butterscotch" "$TXN_DIR/butterscotch"
+fi
+if [ ! -f "$APP/Contents/MacOS/libsteam_api.dylib" ]; then
+    touch "$TXN_DIR/steam-api-was-absent"
 fi
 mkdir -p "$TXN_DIR/code"
 while IFS= read -r -d '' code; do
@@ -237,12 +254,17 @@ rm -f "$APP/Contents/Info.plist.va11-orig"
 RUNNER_TMP="$APP/Contents/MacOS/.butterscotch.new.$$"
 install -m 755 "$RUNNER_SOURCE" "$RUNNER_TMP"
 mv -f "$RUNNER_TMP" "$APP/Contents/MacOS/butterscotch"
+STEAM_API_TMP="$APP/Contents/MacOS/.libsteam_api.new.$$"
+install -m 755 "$STEAM_API_SOURCE" "$STEAM_API_TMP"
+mv -f "$STEAM_API_TMP" "$APP/Contents/MacOS/libsteam_api.dylib"
 /usr/libexec/PlistBuddy -c 'Set CFBundleExecutable butterscotch' "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set NSHighResolutionCapable true' "$APP/Contents/Info.plist" 2>/dev/null \
     || /usr/libexec/PlistBuddy -c 'Add NSHighResolutionCapable bool true' "$APP/Contents/Info.plist"
 msg "Installed the universal runner" "已安装通用 runner"
+msg "Installed the official universal Steamworks runtime" "已安装官方通用 Steamworks 运行库"
 
 xattr -d com.apple.quarantine "$APP/Contents/MacOS/butterscotch" 2>/dev/null || true
+xattr -d com.apple.quarantine "$APP/Contents/MacOS/libsteam_api.dylib" 2>/dev/null || true
 
 # Replace invalid pre-2016 nested signatures before signing the outer bundle.
 while IFS= read -r -d '' code; do
@@ -266,7 +288,7 @@ if [ -d "$APP/Contents/Resources/saves" ]; then
     done < <(find "$APP/Contents/Resources/saves" -maxdepth 1 -type f -print0)
 fi
 
-chown "$APP_UID:$APP_GID" "$APP/Contents/MacOS/butterscotch" "$APP/Contents/Info.plist" 2>/dev/null || true
+chown "$APP_UID:$APP_GID" "$APP/Contents/MacOS/butterscotch" "$APP/Contents/MacOS/libsteam_api.dylib" "$APP/Contents/Info.plist" 2>/dev/null || true
 chown -R "$TARGET_UID:$TARGET_GID" "$CLOUD_SAVES" 2>/dev/null || true
 TXN_ACTIVE=0
 

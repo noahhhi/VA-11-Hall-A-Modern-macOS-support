@@ -32,6 +32,7 @@
 #include "sha1.h"
 #include "base64.h"
 #include "gettime.h"
+#include "steam_bridge.h"
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -6582,15 +6583,39 @@ static RValue builtin_mp_potential_settings(VMContext* ctx, RValue* args, MAYBE_
 
 // ===[ Steam ]===
 
-// Steam stubs
-STUB_RETURN_ZERO(steam_initialised)
-STUB_RETURN_ZERO(steam_stats_ready)
+static RValue builtin_steam_initialised(MAYBE_UNUSED VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    return RValue_makeBool(SteamBridge_isInitialized());
+}
+
+static RValue builtin_steam_stats_ready(MAYBE_UNUSED VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    return RValue_makeBool(SteamBridge_areStatsReady());
+}
+
 STUB_RETURN_ZERO(steam_file_exists)
 STUB_RETURN_UNDEFINED(steam_file_write)
 STUB_RETURN_UNDEFINED(steam_file_read)
-STUB_RETURN_ZERO(steam_get_persona_name)
-STUB_RETURN_ZERO(steam_get_achievement)
-STUB_RETURN_UNDEFINED(steam_set_achievement)
+
+static RValue builtin_steam_get_persona_name(MAYBE_UNUSED VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    return RValue_makeString(SteamBridge_getPersonaName());
+}
+
+static RValue builtin_steam_get_achievement(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeBool(false);
+    char* achievementName = RValue_toString(args[0]);
+    bool achieved = false;
+    bool succeeded = SteamBridge_getAchievement(achievementName, &achieved);
+    free(achievementName);
+    return RValue_makeBool(succeeded && achieved);
+}
+
+static RValue builtin_steam_set_achievement(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeBool(false);
+    char* achievementName = RValue_toString(args[0]);
+    bool succeeded = SteamBridge_setAchievement(achievementName);
+    free(achievementName);
+    return RValue_makeBool(succeeded);
+}
+
 STUB_RETURN_UNDEFINED(steam_send_screenshot)
 
 // ===[ Audio Built-in Functions ]===
@@ -17823,7 +17848,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "array_insert", builtin_array_insert);
     VM_registerBuiltin(ctx, "array_create", builtin_array_create);
 
-    // Steam stubs
+    // Steam
     VM_registerBuiltin(ctx, "steam_initialised", builtin_steam_initialised);
     VM_registerBuiltin(ctx, "steam_stats_ready", builtin_steam_stats_ready);
     VM_registerBuiltin(ctx, "steam_file_exists", builtin_steam_file_exists);
