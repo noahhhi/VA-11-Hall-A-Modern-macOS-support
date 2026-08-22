@@ -11,8 +11,30 @@
 // ===[ Letterbox blit ]===
 
 void GLCommon_computeLetterbox(int32_t gameW, int32_t gameH, int32_t windowW, int32_t windowH, int32_t* outStartX, int32_t* outStartY, int32_t* outEndX, int32_t* outEndY) {
+    // Quantize the content rect to whole multiples of the reduced aspect unit
+    // (e.g. 640x360 -> 16x9), so the horizontal and vertical scale factors are exactly
+    // equal (square source pixels) at any window size. This costs at most a few extra
+    // border pixels compared to fitting each axis independently.
+    int32_t rw = gameW;
+    int32_t rh = gameH;
+    while (rh != 0) {
+        int32_t t = rw % rh;
+        rw = rh;
+        rh = t;
+    }
+    rw = gameW / rw;
+    rh = gameH / rw;
+
+    int32_t kx = windowW / rw;
+    int32_t ky = windowH / rh;
+    int32_t k = kx < ky ? kx : ky;
+
     int32_t effW, effH;
-    if ((gameW * windowH) / gameH < windowW) {
+    if (k >= 1) {
+        effW = rw * k;
+        effH = rh * k;
+    } else if ((gameW * windowH) / gameH < windowW) {
+        // Window smaller than one aspect unit: plain per-axis fit.
         effW = (gameW * windowH) / gameH;
         effH = windowH;
     } else {

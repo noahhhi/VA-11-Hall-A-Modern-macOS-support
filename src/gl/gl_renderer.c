@@ -53,6 +53,25 @@ static const char* baseFragmentShader =
     "    FRAG_COLOR = c;\n"
     "}\n";
 
+// Single-pass "anti-aliased pixelation" present shader (t3ssel8r/SDL family).
+// Each destination pixel has a footprint of tpp = source/dest texels in the source
+// texture. Footprints fully inside one texel snap to that texel's center (hard,
+// bit-exact interior); only footprints straddling a texel boundary blend, by a
+// smoothstep coverage curve over at most one device pixel per axis. Requires
+// GL_LINEAR filtering on the source texture and no mipmaps.
+static const char* pixelartFragmentShader =
+    "uniform sampler2D uTexture;\n"
+    "uniform vec2 uSourceSize;\n"
+    "uniform vec2 uDestSize;\n"
+    "void main() {\n"
+    "    vec2 tpp = clamp(uSourceSize / uDestSize, vec2(1e-6), vec2(1.0));\n"
+    "    vec2 q = vTexCoord * uSourceSize - 0.5 * tpp;\n"
+    "    vec2 phase = fract(q);\n"
+    "    vec2 coverage = smoothstep(vec2(1.0) - tpp, vec2(1.0), phase);\n"
+    "    vec2 uv = (floor(q) + vec2(0.5) + coverage) / uSourceSize;\n"
+    "    FRAG_COLOR = TEXTURE_2D(uTexture, uv);\n"
+    "}\n";
+
 // ===[ Runtime OpenGL extension checks ]===
 
 static bool hasFBO() {
@@ -439,8 +458,8 @@ static void glInit(Renderer* renderer, DataWin* dataWin) {
     gl->isGL3 = (ver.major >= 3);
     gl->isGLES = ver.isGLES;
 
-    // Final-present scale filtering: auto keeps crisp nearest-neighbor at integer ratios and switches
-    // to sharp-bilinear (integer nearest prescale + linear composite) at non-integer ratios.
+    // Final-present scale filtering: auto keeps bit-exact nearest at integer ratios and uses the
+    // single-pass pixelart shader at non-integer ratios.
     gl->sharpSurfaceId = -1;
     gl->sharpScaleN = 0;
     gl->scaleFilter = 0;
@@ -449,6 +468,7 @@ static void glInit(Renderer* renderer, DataWin* dataWin) {
         if (strcmp(scaleFilterEnv, "nearest") == 0) gl->scaleFilter = 1;
         else if (strcmp(scaleFilterEnv, "linear") == 0) gl->scaleFilter = 2;
         else if (strcmp(scaleFilterEnv, "sharp") == 0) gl->scaleFilter = 3;
+        else if (strcmp(scaleFilterEnv, "pixelart") == 0) gl->scaleFilter = 4;
     }
 
 #if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !defined(PLATFORM_VITA)
@@ -527,6 +547,61 @@ static void glInit(Renderer* renderer, DataWin* dataWin) {
     gl->uAlphaTestRef        = getShaderUniform(defaultShader, "uAlphaTestRef",        GL_FLOAT);
     gl->uAlphaTestEnabled    = getShaderUniform(defaultShader, "uAlphaTestEnabled",    GL_BOOL);
     gl->uTexture             = getShaderUniform(defaultShader, "uTexture",             GL_SAMPLER_2D);
+
+    // Compile the single-pass pixel-art present shader (same vertex stage as the default
+    // shader; only the fragment stage differs). If it fails, pixelart mode falls back to nearest.
+    gl->pixelartProgram = 0;
+    {
+        char paVert[1024];
+        char paFrag[2048];
+        if (gl->isGL3) {
+            if (gl->isGLES) {
+                snprintf(paVert, sizeof(paVert),
+                    "%slayout(location = 0) in vec2 aPos;\nlayout(location = 1) in vec4 aColor;\nlayout(location = 2) in vec2 aTexCoord;\n"
+                    "out vec2 vTexCoord;\nout vec4 vColor;\n%s",
+                    vertHeader, baseVertexShader);
+            } else {
+                snprintf(paVert, sizeof(paVert),
+                    "%sin vec2 aPos;\nin vec4 aColor;\nin vec2 aTexCoord;\n"
+                    "out vec2 vTexCoord;\nout vec4 vColor;\n%s",
+                    vertHeader, baseVertexShader);
+            }
+            snprintf(paFrag, sizeof(paFrag),
+                "%sin vec2 vTexCoord;\nout vec4 fragColor;\n"
+                "#define TEXTURE_2D texture\n#define FRAG_COLOR fragColor\n%s",
+                fragHeader, pixelartFragmentShader);
+        } else {
+            snprintf(paVert, sizeof(paVert),
+                "%sattribute vec2 aPos;\nattribute vec4 aColor;\nattribute vec2 aTexCoord;\n"
+                "varying vec2 vTexCoord;\nvarying vec4 vColor;\n%s",
+                vertHeader, baseVertexShader);
+            snprintf(paFrag, sizeof(paFrag),
+                "%svarying vec2 vTexCoord;\n"
+                "#define TEXTURE_2D texture2D\n#define FRAG_COLOR gl_FragColor\n%s",
+                fragHeader, pixelartFragmentShader);
+        }
+
+        bool paVertOK = false;
+        bool paFragOK = false;
+        GLuint paVS = compileShader(GL_VERTEX_SHADER, paVert, &paVertOK);
+        GLuint paFS = paVertOK ? compileShader(GL_FRAGMENT_SHADER, paFrag, &paFragOK) : 0;
+        if (paVertOK && paFragOK) {
+            const char* paAttributes[] = { "aPos", "aColor", "aTexCoord" };
+            bool paLinkOK = false;
+            GLuint prog = linkProgram("pixelart-present", 3, paAttributes, paVS, paFS, &paLinkOK);
+            if (paLinkOK) {
+                gl->pixelartProgram = prog;
+                gl->pixelartUWVP        = glGetUniformLocation(prog, "uWorldViewProjection");
+                gl->pixelartUSourceSize = glGetUniformLocation(prog, "uSourceSize");
+                gl->pixelartUDestSize   = glGetUniformLocation(prog, "uDestSize");
+                gl->pixelartUTexture    = glGetUniformLocation(prog, "uTexture");
+            }
+        }
+        if (paVS) glDeleteShader(paVS);
+        if (paFS) glDeleteShader(paFS);
+        if (gl->pixelartProgram == 0)
+            logWarn("GL: pixel-art present shader unavailable; non-integer ratios fall back to nearest\n");
+    }
 
     gl->gmlShaders = (GMLShader *)safeCalloc(dataWin->shdr.count, sizeof(GMLShader));
     logInfo("GL: %u Shaders Found\n", dataWin->shdr.count);
@@ -795,6 +870,7 @@ static void glDestroy(Renderer* renderer) {
     GLRenderer* gl = (GLRenderer*) renderer;
 
     glDeleteTextures(1, &gl->whiteTexture);
+    if (gl->pixelartProgram != 0) glDeleteProgram(gl->pixelartProgram);
 
     repeat(gl->gmlShaderCount, i) {
         freeShader(&gl->gmlShaders[i]);
@@ -1010,12 +1086,20 @@ static void glEndFrameEnd(Renderer* renderer) {
 
     int32_t sx, sy, ex, ey;
     GLCommon_computeLetterbox(gl->gameW, gl->gameH, gl->windowW, gl->windowH, &sx, &sy, &ex, &ey);
-    bool integerScale = (gl->gameW > 0 && gl->gameH > 0)
-        && ((ex - sx) % gl->gameW == 0) && ((ey - sy) % gl->gameH == 0);
-    // auto: stay pixel-perfect (nearest) at integer ratios, use sharp-bilinear at non-integer ratios.
-    bool sharp = (gl->scaleFilter == 3) || (gl->scaleFilter == 0 && !integerScale);
+    // Default (auto): bit-exact nearest at exact integer ratios; the single-pass pixelart
+    // shader at non-integer ratios (hard texel interiors, one-device-pixel coverage blend
+    // at boundaries). BUTTERSCOTCH_SCALE_FILTER=nearest forces nearest at every ratio,
+    // =linear plain bilinear, =sharp sharp-bilinear, =pixelart forces the shader on.
+    int32_t contentW = ex - sx;
+    int32_t contentH = ey - sy;
+    bool integerScale = contentW > 0 && contentH > 0
+        && (contentW % gl->gameW) == 0 && (contentH % gl->gameH) == 0
+        && (contentW / gl->gameW) == (contentH / gl->gameH);
+    bool sharp = (gl->scaleFilter == 3);
     bool linear = (gl->scaleFilter == 2);
     bool appSurfaceValid = appId >= 0 && (uint32_t) appId < gl->surfaceCount && gl->surfaces[appId] != 0;
+    bool pixelart = (gl->scaleFilter == 4) || (gl->scaleFilter == 0 && !integerScale);
+    if (gl->pixelartProgram == 0 || !appSurfaceValid) pixelart = false;
 
     if (gl->isGL3) {
         GLCommon_beginLetterboxBlit(gl->surfaces[appId], gl->hostFramebuffer);
@@ -1075,14 +1159,28 @@ static void glEndFrameEnd(Renderer* renderer) {
     float scaleX = (float)(ex - sx) / (float) srcW;
     float scaleY = (float)(ey - sy) / (float) srcH;
 
-    if (linear) {
+    if (linear || pixelart) {
+        // Both modes need GL_LINEAR on the app surface (nearest is restored afterwards).
         glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
+    if (pixelart) {
+        glUseProgram(gl->pixelartProgram);
+        Matrix4f flippedClip[MATRICES_MAX];
+        memcpy(flippedClip, renderer->gmlMatrices, sizeof(flippedClip));
+        Matrix4f_flipClipY(&flippedClip[MATRIX_WORLD_VIEW_PROJECTION]);
+        glUniformMatrix4fv(gl->pixelartUWVP, 1, GL_FALSE, flippedClip[MATRIX_WORLD_VIEW_PROJECTION].m);
+        glUniform2f(gl->pixelartUSourceSize, (float) srcW, (float) srcH);
+        glUniform2f(gl->pixelartUDestSize, (float) contentW, (float) contentH);
+        glUniform1i(gl->pixelartUTexture, 1); // flushBatch binds the draw texture to unit 1
+    }
     renderer->vtable->drawSurface(renderer, presentId, 0, 0, srcW, srcH, (float)sx, (float)sy, scaleX, scaleY, 0.0f, 0xFFFFFF, 1.0f);
     flushBatch(gl);
-    if (linear) {
+    if (pixelart) {
+        glShaderSettingsRefresh(renderer); // rebinds the default program and its uniforms
+    }
+    if (linear || pixelart) {
         glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

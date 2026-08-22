@@ -102,11 +102,21 @@ typedef struct {
     bool isGL3; // TRUE if running on OpenGL (ES) 3.x+
     bool isGLES;  // TRUE if running on OpenGL ES (GLES)
 
-    // Final-present scale filtering: 0 = auto (nearest at integer ratios, sharp-bilinear otherwise),
-    // 1 = nearest, 2 = linear, 3 = sharp-bilinear. Parsed once from BUTTERSCOTCH_SCALE_FILTER.
+    // Final-present scale filtering: 0 = auto (nearest at exact integer ratios, pixelart
+    // shader otherwise), 1 = nearest, 2 = linear, 3 = sharp-bilinear, 4 = pixelart (forced).
+    // Parsed once from BUTTERSCOTCH_SCALE_FILTER.
     int32_t scaleFilter;
     int32_t sharpSurfaceId; // intermediate integer-prescaled surface used by sharp-bilinear (-1 = none)
     int32_t sharpScaleN;    // integer factor sharpSurfaceId was created at (0 = none)
+
+    // Single-pass "anti-aliased pixelation" present shader (t3ssel8r/SDL-style UV remap):
+    // texel interiors sample the texel center exactly; only destination pixels straddling a
+    // texel boundary get a one-device-pixel coverage blend. 0 = unavailable (fell back).
+    GLuint pixelartProgram;
+    GLint pixelartUWVP;
+    GLint pixelartUSourceSize;
+    GLint pixelartUDestSize;
+    GLint pixelartUTexture;
 
     // Cached default shader uniforms
     GLShaderUniform* uWorldViewProjection;

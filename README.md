@@ -63,7 +63,7 @@ The upstream Butterscotch runtime needed VA-11-specific fixes, all included in t
 - `FS_set_gm_save_area` / `FS_set_working_directory` (used by the game's `_gmfilesystem_initialize`) with `%appdata%` placeholder mapping — enables the save behavior described above.
 - Lazy texture loading by default in bundled mode, cutting the GPU memory footprint from ~1.3GB to ~540MB (comparable to the original runner's ~650MB).
 - `ds_list_set` and Steam achievement stubs required by this game.
-- Pixel-perfect present scaling: nearest-neighbor at integer ratios; at non-integer ratios (e.g. fullscreen under a 1440x900 HiDPI desktop) an automatic sharp-bilinear pass (integer nearest prescale + linear composite) keeps pixel stroke widths uniform instead of wobbling. Override with `BUTTERSCOTCH_SCALE_FILTER=nearest|linear|sharp`.
+- Pixel-perfect present scaling: bit-exact nearest-neighbor at exact integer ratios; at non-integer ratios a single-pass pixel-art shader (t3ssel8r/SDL-style UV remap) keeps texel interiors hard and blends only destination pixels that straddle a texel boundary (at most one device pixel), so strokes stay uniform without the width wobble of nearest or the overall softness of sharp-bilinear. The letterboxed content rect is quantized to whole multiples of the game's aspect unit (640x360 -> 16x9), guaranteeing exactly square pixels at any window size. Overrides via `BUTTERSCOTCH_SCALE_FILTER`: `=nearest` forces hard nearest at every ratio (1px stroke-width wobble at non-integer ratios), `=sharp` for sharp-bilinear, `=linear` for plain bilinear, `=pixelart` forces the shader on even at integer ratios.
 
 ## Known limitations
 
