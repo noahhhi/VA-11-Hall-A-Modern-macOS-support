@@ -22,8 +22,9 @@ void GLCommon_computeLetterbox(int32_t gameW, int32_t gameH, int32_t windowW, in
         rw = rh;
         rh = t;
     }
-    rw = gameW / rw;
-    rh = gameH / rw;
+    int32_t g = rw; // gcd(gameW, gameH)
+    rw = gameW / g;
+    rh = gameH / g;
 
     int32_t kx = windowW / rw;
     int32_t ky = windowH / rh;

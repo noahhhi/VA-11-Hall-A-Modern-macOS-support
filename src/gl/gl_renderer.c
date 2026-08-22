@@ -1086,19 +1086,21 @@ static void glEndFrameEnd(Renderer* renderer) {
 
     int32_t sx, sy, ex, ey;
     GLCommon_computeLetterbox(gl->gameW, gl->gameH, gl->windowW, gl->windowH, &sx, &sy, &ex, &ey);
-    // Default (auto): bit-exact nearest at exact integer ratios; the single-pass pixelart
-    // shader at non-integer ratios (hard texel interiors, one-device-pixel coverage blend
-    // at boundaries). BUTTERSCOTCH_SCALE_FILTER=nearest forces nearest at every ratio,
-    // =linear plain bilinear, =sharp sharp-bilinear, =pixelart forces the shader on.
+    // Default (auto): nearest at every ratio — the hardest edges the panel can receive,
+    // at the cost of 1px stroke-width wobble at non-integer ratios. Optional overrides via
+    // BUTTERSCOTCH_SCALE_FILTER: =pixelart enables the single-pass shader (uniform strokes,
+    // one-device-pixel boundary blends), =linear plain bilinear, =sharp sharp-bilinear,
+    // =nearest explicit nearest (same as default).
     int32_t contentW = ex - sx;
     int32_t contentH = ey - sy;
     bool integerScale = contentW > 0 && contentH > 0
         && (contentW % gl->gameW) == 0 && (contentH % gl->gameH) == 0
         && (contentW / gl->gameW) == (contentH / gl->gameH);
+    (void) integerScale;
     bool sharp = (gl->scaleFilter == 3);
     bool linear = (gl->scaleFilter == 2);
     bool appSurfaceValid = appId >= 0 && (uint32_t) appId < gl->surfaceCount && gl->surfaces[appId] != 0;
-    bool pixelart = (gl->scaleFilter == 4) || (gl->scaleFilter == 0 && !integerScale);
+    bool pixelart = (gl->scaleFilter == 4);
     if (gl->pixelartProgram == 0 || !appSurfaceValid) pixelart = false;
 
     if (gl->isGL3) {

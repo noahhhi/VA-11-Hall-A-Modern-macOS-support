@@ -63,7 +63,7 @@ cd VA-11-Hall-A-64bit-universal
 - `FS_set_gm_save_area` / `FS_set_working_directory`（游戏 `_gmfilesystem_initialize` 调用）及 `%appdata%` 占位符映射——实现上文所述的存档行为。
 - 打包模式默认启用纹理懒加载，GPU 内存占用从约 1.3GB 降到约 540MB（与原版 runner 约 650MB 相当）。
 - 补全该游戏需要的 `ds_list_set` 与 Steam 成就 stub。
-- 像素完美上屏缩放：精确整数倍率时使用逐比特一致的最近邻；非整数倍率时使用单通道像素艺术着色器（t3ssel8r/SDL 风格 UV 重映射），纹素内部保持硬边，只对横跨纹素边界的目标像素做最多一个设备像素的覆盖混合——笔画宽度均匀，既没有最近邻的宽度抖动，也没有 sharp-bilinear 的整体柔边。letterbox 内容区按游戏画幅单元（640x360 → 16x9）整数化，任意窗口尺寸下源像素都是严格正方形。可用 `BUTTERSCOTCH_SCALE_FILTER` 覆盖：`=nearest` 强制任何倍率最近邻（非整数倍率有 1px 笔画抖动），`=sharp` 为 sharp-bilinear，`=linear` 为纯双线性，`=pixelart` 强制启用着色器（含整数倍率）。
+- 像素完美上屏缩放：任何倍率下都使用最近邻，任意窗口尺寸下像素边缘保持最硬（非整数倍率时笔画宽度可能有 1px 交替）。letterbox 内容区按游戏画幅单元（640x360 → 16x9）整数化，任意窗口尺寸下源像素都是严格正方形。可用 `BUTTERSCOTCH_SCALE_FILTER` 覆盖：`=pixelart` 启用单通道像素艺术着色器（t3ssel8r/SDL 风格 UV 重映射；笔画宽度均匀，边界有一个设备像素的过渡，边缘略柔），`=sharp` 为 sharp-bilinear，`=linear` 为纯双线性，`=nearest` 即默认行为。
 
 ## 已知限制
 
