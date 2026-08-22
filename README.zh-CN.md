@@ -11,6 +11,12 @@
 
 当前参考测试环境：Apple Silicon Mac，macOS 27.0，Steam 版 VA-11 Hall-A（AppID 447530，`game.ios` 字节码 v15）。启动、调酒、设置面板（音量 / 扫描线 / 全屏）与存档读写均已通过本机测试。
 
+<p align="center">
+  <img src="docs/images/apple-silicon-native.png" alt="VA-11 Hall-A 在 Apple Silicon 上原生运行，活动监视器将进程种类显示为 Apple" width="900">
+  <br>
+  <em>原生支持 Apple Silicon（arm64）——活动监视器将运行中的游戏识别为“Apple”进程。</em>
+</p>
+
 > **说明：** 安装包只包含修复组件。你需要在 Steam 上拥有 VA-11 Hall-A；本仓库不包含也不分发任何游戏。
 
 ## 系统要求

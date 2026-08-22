@@ -11,6 +11,12 @@ A native 64-bit runner for the macOS Steam release of *VA-11 Hall-A: Cyberpunk B
 
 Current reference test: Apple Silicon Mac running macOS 27.0, Steam release of VA-11 Hall-A (AppID 447530, `game.ios` bytecode v15). Boot, bartending, the settings panel (volume / scanlines / fullscreen), and save files are covered by local testing.
 
+<p align="center">
+  <img src="docs/images/apple-silicon-native.png" alt="VA-11 Hall-A running natively on Apple Silicon, shown as an Apple process in Activity Monitor" width="900">
+  <br>
+  <em>Native Apple Silicon (arm64) support — Activity Monitor identifies the running game as an Apple process.</em>
+</p>
+
 > **Note:** The installer contains fixes only. You must own VA-11 Hall-A on Steam; this repository does not include or distribute the game.
 
 ## Requirements
