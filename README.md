@@ -31,6 +31,10 @@ cd VA-11-Hall-A-64bit-universal
 
 The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing binary architectures, and permission failures without leaving a half-installed runner. Launch the game from Steam as usual after it succeeds.
 
+### Architecture selection
+
+The Release runner is Universal. macOS automatically uses `arm64` on Apple Silicon and `x86_64` on Intel. On Apple Silicon, you can manually test the Intel slice by quitting the game, selecting the game app in Finder, choosing **File → Get Info**, and enabling **Open using Rosetta**. Disable that option to return to native arm64. Native arm64 is recommended for normal play; this choice does not change the Auto rendering policy.
+
 > [!IMPORTANT]
 > The runner is ad-hoc signed (re-signed on your machine by `install.sh`). If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. You do not need to disable Gatekeeper or reduce system security.
 
@@ -45,8 +49,16 @@ Save files are written to `~/Library/Application Support/VA_11_Hall_A/saves/` �
 
 ## Uninstall
 
+`uninstall.sh` is included in every Release ZIP and inside the PKG payload. From an extracted ZIP, run:
+
 ```sh
 ./uninstall.sh
+```
+
+After installing the PKG, the same script is available at:
+
+```sh
+"/Library/Application Support/VA-11-Hall-A-64bit/uninstall.sh"
 ```
 
 This restores the original `Mac_Runner` entry point from the backup made during installation and re-signs the bundle. Your save files are left untouched.

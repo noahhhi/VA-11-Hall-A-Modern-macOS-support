@@ -31,6 +31,10 @@ cd VA-11-Hall-A-64bit-universal
 
 安装器会明确报告 macOS 版本不支持、Steam 库缺失、app 包结构异常、runner 缺少架构或权限不足等错误，并在失败时回滚，避免留下半安装状态。成功后照常从 Steam 启动游戏。
 
+### 手动选择架构
+
+Release 中的 runner 是 Universal 二进制。macOS 会在 Apple Silicon 上自动运行 `arm64`，在 Intel Mac 上自动运行 `x86_64`。如需在 Apple Silicon 上手动测试 Intel 切片，请先退出游戏，在 Finder 中选中游戏 app，打开 **文件 → 显示简介**，勾选 **使用 Rosetta 打开**；取消勾选即可恢复原生 arm64。日常游玩推荐原生 arm64；架构选择不会改变唯一的 Auto 渲染策略。
+
 > [!IMPORTANT]
 > runner 使用 ad-hoc 签名（由 `install.sh` 在你本机完成重签）。如果 macOS 阻止首次启动，打开 **系统设置 → 隐私与安全性**，点击 **仍要打开**。无需关闭 Gatekeeper 或降低系统安全性。
 
@@ -45,8 +49,16 @@ cd VA-11-Hall-A-64bit-universal
 
 ## 卸载
 
+每个 Release ZIP 都包含 `uninstall.sh`，PKG payload 中也包含同一脚本。从解压后的 ZIP 运行：
+
 ```sh
 ./uninstall.sh
+```
+
+如果通过 PKG 安装，脚本位于：
+
+```sh
+"/Library/Application Support/VA-11-Hall-A-64bit/uninstall.sh"
 ```
 
 会从安装时创建的备份恢复原版 `Mac_Runner` 入口并重新签名，存档不受影响。

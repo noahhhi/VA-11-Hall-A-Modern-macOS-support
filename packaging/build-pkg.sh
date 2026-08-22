@@ -35,6 +35,7 @@ mkdir -p "$SUPPORT" "$OUTPUT_DIR"
 install -m 755 "$RUNNER" "$SUPPORT/butterscotch"
 install -m 755 "$REPO_DIR/install.sh" "$SUPPORT/install.sh"
 install -m 755 "$REPO_DIR/uninstall.sh" "$SUPPORT/uninstall.sh"
+install -m 644 "$REPO_DIR/RELEASE_NOTES.md" "$SUPPORT/RELEASE_NOTES.md"
 install -m 644 "$REPO_DIR/LICENSE" "$SUPPORT/LICENSE"
 
 UNSIGNED="$STAGE/unsigned.pkg"
