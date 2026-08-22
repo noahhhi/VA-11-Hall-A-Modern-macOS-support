@@ -1,0 +1,24 @@
+#!/bin/bash
+# pkgbuild postinstall: run the project installer for the logged-in Steam user.
+set -euo pipefail
+
+SUPPORT_DIR="/Library/Application Support/VA-11-Hall-A-64bit"
+CONSOLE_USER="$(stat -f '%Su' /dev/console)"
+
+case "$CONSOLE_USER" in
+    ""|root|loginwindow|_mbsetupuser)
+        echo "error: no logged-in desktop user was found" >&2
+        exit 1
+        ;;
+esac
+
+TARGET_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | sed 's/^NFSHomeDirectory:[[:space:]]*//')"
+if [ -z "$TARGET_HOME" ] || [ ! -d "$TARGET_HOME" ]; then
+    echo "error: could not resolve the home directory for $CONSOLE_USER" >&2
+    exit 1
+fi
+
+echo "Installing VA-11 Hall-A 64-bit runner for $CONSOLE_USER"
+env VA11_TARGET_HOME="$TARGET_HOME" "$SUPPORT_DIR/install.sh"
+
+exit 0

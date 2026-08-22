@@ -1,7 +1,14 @@
 #!/bin/bash
-# Double-clickable installer for regular players: runs install.sh in a Terminal window.
-# If macOS blocks the first double-click, right-click the file and choose Open.
-cd "$(dirname "$0")"
-./install.sh
+# Double-clickable installer for regular players. A game app dragged onto this
+# file is forwarded to install.sh; otherwise every Steam library is searched.
+cd "$(dirname "$0")" || exit 1
+./install.sh "$@"
+status=$?
 echo ""
-read -r -p "Press Return to close this window..."
+if [ "$status" -eq 0 ]; then
+    echo "Installation complete. / 安装完成。"
+else
+    echo "Installation failed (status $status). / 安装失败。"
+fi
+read -r -p "Press Return to close this window... / 按回车键关闭窗口……"
+exit "$status"

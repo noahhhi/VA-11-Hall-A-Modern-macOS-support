@@ -81,10 +81,17 @@ jobs:
         run: |
           set -e
           pkg="VA-11-Hall-A-64bit-universal"
-          lipo -create bin-arm64/butterscotch bin-x86_64/butterscotch -output butterscotch
-          lipo -info butterscotch
+          mkdir -p dist-bin
+          lipo -create bin-arm64/butterscotch bin-x86_64/butterscotch -output dist-bin/butterscotch-universal
+          lipo -info dist-bin/butterscotch-universal
+          chmod +x dist-bin/butterscotch-universal
+          codesign --force --sign - dist-bin/butterscotch-universal
+          version="1.1.0-preview"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
+          packaging/build-pkg.sh "$version" dist-bin/butterscotch-universal
           mkdir -p "pkg/$pkg"
-          cp butterscotch install.sh uninstall.sh README.md README.zh-CN.md LICENSE "pkg/$pkg/"
+          cp dist-bin/butterscotch-universal "pkg/$pkg/butterscotch"
+          cp install.sh uninstall.sh README.md README.zh-CN.md LICENSE "pkg/$pkg/"
           cp "Install VA-11 Hall-A 64bit.command" "pkg/$pkg/"
           chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh" "pkg/$pkg/Install VA-11 Hall-A 64bit.command"
           cd pkg && zip -r "$pkg.zip" "$pkg"
@@ -93,10 +100,12 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: VA-11-Hall-A-64bit-universal
-          path: pkg/VA-11-Hall-A-64bit-universal.zip
+          path: |
+            pkg/VA-11-Hall-A-64bit-universal.zip
+            dist-bin/VA-11-Hall-A-64bit-universal.pkg
 
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
-        run: gh release upload "${GITHUB_REF_NAME}" "pkg/VA-11-Hall-A-64bit-universal.zip" --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" "pkg/VA-11-Hall-A-64bit-universal.zip" "dist-bin/VA-11-Hall-A-64bit-universal.pkg" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
