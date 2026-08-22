@@ -33,7 +33,7 @@ cd VA-11-Hall-A-64bit-universal
 
 ### 手动选择架构
 
-Release 中的 runner 是 Universal 二进制。macOS 会在 Apple Silicon 上自动运行 `arm64`，在 Intel Mac 上自动运行 `x86_64`。如需在 Apple Silicon 上手动测试 Intel 切片，请先退出游戏，在 Finder 中选中游戏 app，打开 **文件 → 显示简介**，勾选 **使用 Rosetta 打开**；取消勾选即可恢复原生 arm64。日常游玩推荐原生 arm64；架构选择不会改变唯一的 Auto 渲染策略。
+Release 中的 runner 是 Universal 二进制。macOS 会在 Apple Silicon 上自动运行 `arm64`，在 Intel Mac 上自动运行 `x86_64`。如需在 Apple Silicon 上手动测试 Intel 切片，请先退出游戏，在 Finder 中选中游戏 app，打开 **文件 → 显示简介**，勾选 **使用 Rosetta 打开**；取消勾选即可恢复原生 arm64。日常游玩推荐原生 arm64。
 
 > [!IMPORTANT]
 > runner 使用 ad-hoc 签名（由 `install.sh` 在你本机完成重签）。如果 macOS 阻止首次启动，打开 **系统设置 → 隐私与安全性**，点击 **仍要打开**。无需关闭 Gatekeeper 或降低系统安全性。
@@ -49,16 +49,10 @@ Release 中的 runner 是 Universal 二进制。macOS 会在 Apple Silicon 上�
 
 ## 卸载
 
-每个 Release ZIP 都包含 `uninstall.sh`，PKG payload 中也包含同一脚本。从解压后的 ZIP 运行：
+从同一 GitHub Release 单独下载 `uninstall.sh`，然后运行：
 
 ```sh
-./uninstall.sh
-```
-
-如果通过 PKG 安装，脚本位于：
-
-```sh
-"/Library/Application Support/VA-11-Hall-A-64bit/uninstall.sh"
+bash ~/Downloads/uninstall.sh
 ```
 
 会从安装时创建的备份恢复原版 `Mac_Runner` 入口并重新签名，存档不受影响。
@@ -68,15 +62,12 @@ Release 中的 runner 是 Universal 二进制。macOS 会在 Apple Silicon 上�
 上游 Butterscotch 运行时需要的 VA-11 专属修复，均已包含在本包中：
 
 - 按纹理 alpha 计算 GMS1.4 自动精灵包围盒（`bboxMode=0`）——修复设置菜单中失灵的按钮判定（音量按钮、滑块）与点击串扰。
-- AppKit 后端的 HiDPI 鼠标坐标换算。
 - `FS_set_gm_save_area` / `FS_set_working_directory`（游戏 `_gmfilesystem_initialize` 调用）及 `%appdata%` 占位符映射——实现上文所述的存档行为。
 - 打包模式默认启用纹理懒加载，GPU 内存占用从约 1.3GB 降到约 540MB（与原版 runner 约 650MB 相当）。
 - 补全该游戏需要的 `ds_list_set` 与 Steam 成就 stub。
-- 唯一且自动的 HiDPI 上屏策略：应用表面为整数倍率时使用逐像素一致的最近邻；非整数放大时使用单 pass 的 t3ssel8r/SDL 风格像素艺术 UV 重映射，将过渡限制在源像素边界处最多一个设备像素；缩小时使用线性过滤。AppKit 提供真实 backing 像素尺寸，16:9 letterbox 内容区按等比例整数化，保证横纵倍率完全一致。没有模式选择器，也不读取旧偏好文件或环境变量。
 
 ## 已知限制
 
-- VA-11 Hall-A 先合成到 1280x720 应用表面，其中绝大多数美术又来自放大两倍的 640x360 像素网格。2880x1620 的 16:9 内容区相对应用表面是 2.25 倍（相对原始网格是 4.5 倍），因此不可能同时做到完全硬边、每个源像素等宽并铺满画面。Auto 把不可避免的分数边界限制为一个目标像素，而不会模糊整个源像素内部。
 - 设置面板中扫描线开关的标签恒显示"Off"。这是游戏自身逻辑的 bug——原版 32 位 runner 表现完全相同——并非本移植的回归。
 - Steam 成就为 stub（不影响游玩）。
 - Steam 云存档仅在 Mac 之间同步。发行商的 AutoCloud 配置将 Windows、macOS、Linux 的存档隔离在三个独立命名空间，存档不会与 Steam Deck / Windows PC 互通。原版游戏行为相同，runner 无法改变。
@@ -93,7 +84,6 @@ make BACKEND=appkit CFLAGS="-arch x86_64" LDFLAGS="-arch x86_64" -j4
 ```
 
 完整的 Butterscotch 构建文档见 [README.upstream.md](README.upstream.md)。
-完整根因、对比截图与像素量化结果见 [HIDPI_RENDERING_REPORT.md](HIDPI_RENDERING_REPORT.md)。
 
 ## 许可证与致谢
 

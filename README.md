@@ -33,7 +33,7 @@ The installer reports unsupported macOS versions, missing Steam libraries, malfo
 
 ### Architecture selection
 
-The Release runner is Universal. macOS automatically uses `arm64` on Apple Silicon and `x86_64` on Intel. On Apple Silicon, you can manually test the Intel slice by quitting the game, selecting the game app in Finder, choosing **File → Get Info**, and enabling **Open using Rosetta**. Disable that option to return to native arm64. Native arm64 is recommended for normal play; this choice does not change the Auto rendering policy.
+The Release runner is Universal. macOS automatically uses `arm64` on Apple Silicon and `x86_64` on Intel. On Apple Silicon, you can manually test the Intel slice by quitting the game, selecting the game app in Finder, choosing **File → Get Info**, and enabling **Open using Rosetta**. Disable that option to return to native arm64. Native arm64 is recommended for normal play.
 
 > [!IMPORTANT]
 > The runner is ad-hoc signed (re-signed on your machine by `install.sh`). If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. You do not need to disable Gatekeeper or reduce system security.
@@ -49,16 +49,10 @@ Save files are written to `~/Library/Application Support/VA_11_Hall_A/saves/` �
 
 ## Uninstall
 
-`uninstall.sh` is included in every Release ZIP and inside the PKG payload. From an extracted ZIP, run:
+Download the standalone `uninstall.sh` asset from the same GitHub Release, then run:
 
 ```sh
-./uninstall.sh
-```
-
-After installing the PKG, the same script is available at:
-
-```sh
-"/Library/Application Support/VA-11-Hall-A-64bit/uninstall.sh"
+bash ~/Downloads/uninstall.sh
 ```
 
 This restores the original `Mac_Runner` entry point from the backup made during installation and re-signs the bundle. Your save files are left untouched.
@@ -68,15 +62,12 @@ This restores the original `Mac_Runner` entry point from the backup made during 
 The upstream Butterscotch runtime needed VA-11-specific fixes, all included in this package:
 
 - GMS1.4 automatic sprite bounding boxes (`bboxMode=0`) computed from texture alpha — fixes broken menu hitboxes (volume buttons, sliders) and click crosstalk.
-- HiDPI mouse coordinate translation in the AppKit backend.
 - `FS_set_gm_save_area` / `FS_set_working_directory` (used by the game's `_gmfilesystem_initialize`) with `%appdata%` placeholder mapping — enables the save behavior described above.
 - Lazy texture loading by default in bundled mode, cutting the GPU memory footprint from ~1.3GB to ~540MB (comparable to the original runner's ~650MB).
 - `ds_list_set` and Steam achievement stubs required by this game.
-- Automatic HiDPI presentation with no mode selector: exact integer application-surface ratios use bit-exact nearest-neighbor; non-integer magnification uses a single-pass t3ssel8r/SDL-style pixel-art UV remap with an at-most-one-device-pixel boundary transition; minification uses linear filtering. AppKit supplies actual backing-pixel dimensions, and the 16:9 letterbox rectangle is quantized so horizontal and vertical scale match exactly.
 
 ## Known limitations
 
-- VA-11 Hall-A composites into a 1280x720 application surface whose artwork is mostly a doubled 640x360 pixel grid. A 2880x1620 16:9 viewport is therefore 2.25x the application surface (4.5x the authored grid), so mathematically hard and perfectly equal source-pixel widths cannot both fill it. Auto limits the compromise to one destination pixel at source boundaries instead of blurring whole texel interiors.
 - The scanlines toggle label in the settings panel displays "Off" even when enabled. This is a bug in the game's own logic — the original 32-bit runner behaves identically — and is not a regression of this port.
 - Steam achievements are stubbed; gameplay is unaffected.
 - Steam Cloud syncs saves between Macs only. The publisher's AutoCloud config keeps Windows, macOS, and Linux saves in separate namespaces, so saves never travel to or from a Steam Deck / Windows PC. The original game behaves the same way; no runner change can alter it.
@@ -93,7 +84,6 @@ make BACKEND=appkit CFLAGS="-arch x86_64" LDFLAGS="-arch x86_64" -j4
 ```
 
 See [README.upstream.md](README.upstream.md) for the full Butterscotch build documentation.
-The full diagnosis, screenshots, and pixel metrics are in [HIDPI_RENDERING_REPORT.md](HIDPI_RENDERING_REPORT.md).
 
 ## License and credits
 

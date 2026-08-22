@@ -8,6 +8,6 @@ Runner 同时包含 `arm64` 与 `x86_64`。macOS 默认自动选择原生架构�
 
 ## Uninstall / 卸载
 
-The Release ZIP includes executable `uninstall.sh`. The PKG installs the same script at `/Library/Application Support/VA-11-Hall-A-64bit/uninstall.sh`. It restores the preserved Steam runner and signature while leaving saves untouched.
+Download `uninstall.sh` as a standalone asset from the GitHub Release and run it with `bash ~/Downloads/uninstall.sh`. It restores the preserved Steam runner and signature while leaving saves untouched.
 
-Release ZIP 中包含可执行的 `uninstall.sh`；PKG 会把同一脚本安装到 `/Library/Application Support/VA-11-Hall-A-64bit/uninstall.sh`。脚本恢复留存的 Steam runner 与签名，不删除存档。
+从 GitHub Release 单独下载 `uninstall.sh`，运行 `bash ~/Downloads/uninstall.sh`。脚本恢复留存的 Steam runner 与签名，不删除存档。
