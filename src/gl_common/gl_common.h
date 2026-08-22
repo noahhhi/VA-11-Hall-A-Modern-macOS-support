@@ -24,6 +24,7 @@ void GLCommon_computeLetterbox(int32_t gameW, int32_t gameH, int32_t windowW, in
 // Blits the given FBO (typically the application_surface) into hostFbo with letterboxing (hostFbo 0 == the window).
 // filter is GL_NEAREST or GL_LINEAR and applies to the final upscale.
 void GLCommon_beginLetterboxBlit(GLuint fbo, GLuint hostFbo);
+void GLCommon_endBlitToRect(int32_t fboWidth, int32_t fboHeight, int32_t startX, int32_t startY, int32_t endX, int32_t endY, GLuint hostFbo, GLint filter);
 void GLCommon_endLetterboxBlit(int32_t fboWidth, int32_t fboHeight, int32_t gameW, int32_t gameH, int32_t windowW, int32_t windowH, GLuint hostFbo, GLint filter);
 
 // ===[ Surface arrays ]===

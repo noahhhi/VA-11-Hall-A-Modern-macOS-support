@@ -320,10 +320,9 @@ void platformSetWindowTitle(const char* title) {
 }
 
 bool platformGetWindowSize(int32_t *outW, int32_t *outH) {
-    NSRect bounds = [glView bounds];
-    CGFloat scale = [window backingScaleFactor];
-    *outW = (int32_t)bounds.size.width * scale;
-    *outH = (int32_t)bounds.size.height * scale;
+    NSRect backing = [glView convertRectToBacking:[glView bounds]];
+    *outW = (int32_t)backing.size.width;
+    *outH = (int32_t)backing.size.height;
 
     return true;
 }
@@ -599,6 +598,10 @@ bool platformInit(int32_t reqW, int32_t reqH, const char *title, bool headless) 
             initWithFrame:rect
               pixelFormat:pf];
 
+    // Request a drawable in backing pixels explicitly. This keeps direct
+    // development launches and patched Steam bundles on the same HiDPI path.
+    [glView setWantsBestResolutionOpenGLSurface:YES];
+
     [window setContentView:glView];
     [window makeFirstResponder:glView];
     [window setContentView:glView];
@@ -626,6 +629,15 @@ bool platformInit(int32_t reqW, int32_t reqH, const char *title, bool headless) 
     [[NSNotificationCenter defaultCenter] addObserverForName:NSWindowDidExitFullScreenNotification object:window queue:[NSOperationQueue mainQueue] usingBlock:reassertCursor];
 
     [NSApp activateIgnoringOtherApps:YES];
+
+    // Test/recovery hook for launches that need to begin on the exact fullscreen
+    // drawable without synthesizing UI events. Normal bundled launches leave it off.
+    const char *startFullscreen = getenv("BUTTERSCOTCH_START_FULLSCREEN");
+    if (startFullscreen != nullptr && strcmp(startFullscreen, "1") == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [window toggleFullScreen:nil];
+        });
+    }
 
     return true;
 }

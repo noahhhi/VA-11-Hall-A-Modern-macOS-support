@@ -458,18 +458,9 @@ static void glInit(Renderer* renderer, DataWin* dataWin) {
     gl->isGL3 = (ver.major >= 3);
     gl->isGLES = ver.isGLES;
 
-    // Final-present scale filtering: auto keeps bit-exact nearest at integer ratios and uses the
-    // single-pass pixelart shader at non-integer ratios.
-    gl->sharpSurfaceId = -1;
-    gl->sharpScaleN = 0;
-    gl->scaleFilter = 0;
-    const char* scaleFilterEnv = getenv("BUTTERSCOTCH_SCALE_FILTER");
-    if (scaleFilterEnv != nullptr) {
-        if (strcmp(scaleFilterEnv, "nearest") == 0) gl->scaleFilter = 1;
-        else if (strcmp(scaleFilterEnv, "linear") == 0) gl->scaleFilter = 2;
-        else if (strcmp(scaleFilterEnv, "sharp") == 0) gl->scaleFilter = 3;
-        else if (strcmp(scaleFilterEnv, "pixelart") == 0) gl->scaleFilter = 4;
-    }
+    // Auto keeps bit-exact nearest at integer ratios and uses the single-pass
+    // pixel-art shader at non-integer magnification ratios.
+    logInfo("GL: present scaling = auto\n");
 
 #if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !defined(PLATFORM_VITA)
     gl_init_wrappers();
@@ -1086,26 +1077,19 @@ static void glEndFrameEnd(Renderer* renderer) {
 
     int32_t sx, sy, ex, ey;
     GLCommon_computeLetterbox(gl->gameW, gl->gameH, gl->windowW, gl->windowH, &sx, &sy, &ex, &ey);
-    // Default (auto): nearest at every ratio — the hardest edges the panel can receive,
-    // at the cost of 1px stroke-width wobble at non-integer ratios. Optional overrides via
-    // BUTTERSCOTCH_SCALE_FILTER: =pixelart enables the single-pass shader (uniform strokes,
-    // one-device-pixel boundary blends), =linear plain bilinear, =sharp sharp-bilinear,
-    // =nearest explicit nearest (same as default).
     int32_t contentW = ex - sx;
     int32_t contentH = ey - sy;
     bool integerScale = contentW > 0 && contentH > 0
         && (contentW % gl->gameW) == 0 && (contentH % gl->gameH) == 0
         && (contentW / gl->gameW) == (contentH / gl->gameH);
-    (void) integerScale;
-    bool sharp = (gl->scaleFilter == 3);
-    bool linear = (gl->scaleFilter == 2);
+    bool minifying = contentW < gl->gameW || contentH < gl->gameH;
     bool appSurfaceValid = appId >= 0 && (uint32_t) appId < gl->surfaceCount && gl->surfaces[appId] != 0;
-    bool pixelart = (gl->scaleFilter == 4);
-    if (gl->pixelartProgram == 0 || !appSurfaceValid) pixelart = false;
+    bool linear = minifying;
+    bool pixelart = !integerScale && !minifying && appSurfaceValid && gl->pixelartProgram != 0;
 
-    if (gl->isGL3) {
+    if (gl->isGL3 && !pixelart) {
         GLCommon_beginLetterboxBlit(gl->surfaces[appId], gl->hostFramebuffer);
-        GLCommon_endLetterboxBlit(gl->surfaceWidth[appId], gl->surfaceHeight[appId], gl->gameW, gl->gameH, gl->windowW, gl->windowH, gl->hostFramebuffer, (sharp || linear) ? GL_LINEAR : GL_NEAREST);
+        GLCommon_endBlitToRect(gl->surfaceWidth[appId], gl->surfaceHeight[appId], sx, sy, ex, ey, gl->hostFramebuffer, linear ? GL_LINEAR : GL_NEAREST);
         return;
     }
 
@@ -1114,43 +1098,6 @@ static void glEndFrameEnd(Renderer* renderer) {
     if (scissorWasEnabled) glDisable(GL_SCISSOR_TEST);
     glDisable(GL_BLEND);
 
-    int32_t presentId = appId;
-    int32_t srcW = gl->gameW;
-    int32_t srcH = gl->gameH;
-
-    if (sharp && appSurfaceValid) {
-        // Sharp-bilinear, stage 1: integer nearest-neighbor prescale into an intermediate surface.
-        int32_t n = (ex - sx + gl->gameW - 1) / gl->gameW; // ceil of the final ratio
-        if (n < 1) n = 1;
-        if (n > 16) n = 16;
-        int32_t sharpW = gl->gameW * n;
-        int32_t sharpH = gl->gameH * n;
-        if (gl->sharpSurfaceId < 0 || gl->sharpScaleN != n
-            || (uint32_t) gl->sharpSurfaceId >= gl->surfaceCount || gl->surfaces[gl->sharpSurfaceId] == 0) {
-            if (gl->sharpSurfaceId >= 0 && (uint32_t) gl->sharpSurfaceId < gl->surfaceCount && gl->surfaces[gl->sharpSurfaceId] != 0) {
-                glSurfaceFree(renderer, gl->sharpSurfaceId);
-            }
-            gl->sharpSurfaceId = glCreateSurface(renderer, sharpW, sharpH);
-            gl->sharpScaleN = n;
-            // The intermediate is only ever sampled by the stage-2 composite below.
-            // Stage 2 always minifies (n = ceil of the final ratio), so GL_LINEAR must be set
-            // on MIN_FILTER; MAG_FILTER alone would leave the minified sample at GL_NEAREST.
-            glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[gl->sharpSurfaceId]);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, gl->surfaces[gl->sharpSurfaceId]);
-        glViewport(0, 0, sharpW, sharpH);
-        renderer->vtable->setGuiProjection(renderer, sharpW, sharpH, sharpW, sharpH, true);
-        renderer->vtable->drawSurface(renderer, appId, 0, 0, gl->gameW, gl->gameH, 0.0f, 0.0f, (float) n, (float) n, 0.0f, 0xFFFFFF, 1.0f);
-        flushBatch(gl);
-        glBindFramebuffer(GL_FRAMEBUFFER, gl->hostFramebuffer);
-
-        presentId = gl->sharpSurfaceId;
-        srcW = sharpW;
-        srcH = sharpH;
-    }
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -1158,12 +1105,11 @@ static void glEndFrameEnd(Renderer* renderer) {
 
     renderer->vtable->setGuiProjection(renderer, gl->windowW, gl->windowH, gl->windowW, gl->windowH, false);
 
-    float scaleX = (float)(ex - sx) / (float) srcW;
-    float scaleY = (float)(ey - sy) / (float) srcH;
+    float scaleX = (float) contentW / (float) gl->gameW;
+    float scaleY = (float) contentH / (float) gl->gameH;
 
     if (linear || pixelart) {
-        // Both modes need GL_LINEAR on the app surface (nearest is restored afterwards).
-        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
+        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[appId]);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
@@ -1173,17 +1119,17 @@ static void glEndFrameEnd(Renderer* renderer) {
         memcpy(flippedClip, renderer->gmlMatrices, sizeof(flippedClip));
         Matrix4f_flipClipY(&flippedClip[MATRIX_WORLD_VIEW_PROJECTION]);
         glUniformMatrix4fv(gl->pixelartUWVP, 1, GL_FALSE, flippedClip[MATRIX_WORLD_VIEW_PROJECTION].m);
-        glUniform2f(gl->pixelartUSourceSize, (float) srcW, (float) srcH);
+        glUniform2f(gl->pixelartUSourceSize, (float) gl->gameW, (float) gl->gameH);
         glUniform2f(gl->pixelartUDestSize, (float) contentW, (float) contentH);
         glUniform1i(gl->pixelartUTexture, 1); // flushBatch binds the draw texture to unit 1
     }
-    renderer->vtable->drawSurface(renderer, presentId, 0, 0, srcW, srcH, (float)sx, (float)sy, scaleX, scaleY, 0.0f, 0xFFFFFF, 1.0f);
+    renderer->vtable->drawSurface(renderer, appId, 0, 0, gl->gameW, gl->gameH, (float)sx, (float)sy, scaleX, scaleY, 0.0f, 0xFFFFFF, 1.0f);
     flushBatch(gl);
     if (pixelart) {
         glShaderSettingsRefresh(renderer); // rebinds the default program and its uniforms
     }
     if (linear || pixelart) {
-        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[presentId]);
+        glBindTexture(GL_TEXTURE_2D, gl->surfaceTexture[appId]);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
