@@ -25,6 +25,14 @@ available. If Gatekeeper blocks it, right-click the package and choose
 **Open**, or allow it under **System Settings → Privacy & Security**. Do not
 disable Gatekeeper.
 
+If the PKG reports that installation failed, run this command in Terminal. It
+creates `VA11-install-log.txt` on the Desktop; attach that file to a
+[GitHub issue](https://github.com/noahhhi/VA-11-Hall-A-Modern-macOS-support/issues):
+
+```sh
+/usr/bin/grep -iE 'VA-11|io.github.noahhhi|postinstall|xcrun|lipo|nm|codesign|error' /var/log/install.log | /usr/bin/tail -n 200 > "$HOME/Desktop/VA11-install-log.txt"
+```
+
 The runner contains both architectures. macOS selects `arm64` on Apple Silicon
 and `x86_64` on Intel automatically. To test `x86_64` on Apple Silicon, quit
 the game and enable **Finder → Get Info → Open using Rosetta**; disable it to
@@ -62,6 +70,15 @@ PKG 与 ZIP 现已包含 Valve 官方 Universal Steamworks 运行库。Steam 成
 由于当前没有 Developer ID Installer 证书，PKG 尚未签名。如被 Gatekeeper
 拦截，请右键安装包选择 **打开**，或前往 **系统设置 → 隐私与安全性** 允许打开；
 无需关闭 Gatekeeper。
+
+如果 PKG 提示安装失败，请在终端运行以下命令。命令会在桌面生成
+`VA11-install-log.txt`；前往
+[GitHub Issues](https://github.com/noahhhi/VA-11-Hall-A-Modern-macOS-support/issues)
+反馈时请附上该文件：
+
+```sh
+/usr/bin/grep -iE 'VA-11|io.github.noahhhi|postinstall|xcrun|lipo|nm|codesign|error' /var/log/install.log | /usr/bin/tail -n 200 > "$HOME/Desktop/VA11-install-log.txt"
+```
 
 runner 同时包含两种架构，macOS 会在 Apple Silicon 上自动选择 `arm64`，在
 Intel Mac 上自动选择 `x86_64`。如需在 Apple Silicon 上测试 `x86_64`，请先

@@ -35,7 +35,13 @@ cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
 
-The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing component architectures, and permission failures. If installation fails, it rolls back automatically instead of leaving the app in an invalid state. Launch the game from Steam as usual after it succeeds.
+The installer reports unsupported macOS versions, missing Steam libraries, malformed app bundles, missing installation components, and permission failures. If installation fails, it rolls back automatically instead of leaving the app in an invalid state. Launch the game from Steam as usual after it succeeds.
+
+If the PKG reports that installation failed, run the following command in Terminal. It creates `VA11-install-log.txt` on your Desktop; attach that file when opening a [GitHub issue](https://github.com/noahhhi/VA-11-Hall-A-Modern-macOS-support/issues).
+
+```sh
+/usr/bin/grep -iE 'VA-11|io.github.noahhhi|postinstall|xcrun|lipo|nm|codesign|error' /var/log/install.log | /usr/bin/tail -n 200 > "$HOME/Desktop/VA11-install-log.txt"
+```
 
 > [!IMPORTANT]
 > The runner is ad-hoc signed (re-signed on your machine by `install.sh`). If macOS blocks the first launch, open **System Settings → Privacy & Security** and click **Open Anyway**. You do not need to disable Gatekeeper or reduce system security.

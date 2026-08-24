@@ -44,6 +44,7 @@ jobs:
           cmake -B build -G Ninja \
             -DWERROR=ON \
             -DCMAKE_C_FLAGS="-Wno-deprecated-declarations" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DBACKEND=appkit \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -51,6 +52,12 @@ jobs:
 
       - name: Build
         run: cmake --build build
+
+      - name: Verify deployment target
+        run: |
+          minos="$(otool -l build/butterscotch | awk '/cmd LC_BUILD_VERSION/{found=1; next} found && $1=="minos"{print $2; exit}')"
+          test "$minos" = "11.0"
+          echo "Minimum macOS: $minos"
 
       - name: Upload raw binary
         uses: actions/upload-artifact@v7
@@ -84,18 +91,30 @@ jobs:
           mkdir -p dist-bin
           lipo -create bin-arm64/butterscotch bin-x86_64/butterscotch -output dist-bin/butterscotch-universal
           lipo -info dist-bin/butterscotch-universal
+          for arch in arm64 x86_64; do
+            minos="$(otool -arch "$arch" -l dist-bin/butterscotch-universal | awk '/cmd LC_BUILD_VERSION/{found=1; next} found && $1=="minos"{print $2; exit}')"
+            test "$minos" = "11.0"
+            echo "$arch minimum macOS: $minos"
+          done
           chmod +x dist-bin/butterscotch-universal
           codesign --force --sign - dist-bin/butterscotch-universal
           version="1.1.0-preview"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           packaging/build-pkg.sh "$version" dist-bin/butterscotch-universal
           mkdir -p "pkg/$pkg"
-          cp dist-bin/butterscotch-universal "pkg/$pkg/butterscotch"
-          cp vendor/steamworks/redistributable_bin/osx/libsteam_api.dylib "pkg/$pkg/libsteam_api.dylib"
-          cp install.sh uninstall.sh README.md README.zh-CN.md RELEASE_NOTES.md LICENSE "pkg/$pkg/"
-          cp "Install VA-11 Hall-A 64bit.command" "pkg/$pkg/"
+          cp -X dist-bin/butterscotch-universal "pkg/$pkg/butterscotch"
+          cp -X vendor/steamworks/redistributable_bin/osx/libsteam_api.dylib "pkg/$pkg/libsteam_api.dylib"
+          cp -X install.sh uninstall.sh README.md README.zh-CN.md RELEASE_NOTES.md LICENSE "pkg/$pkg/"
+          cp -X "Install VA-11 Hall-A 64bit.command" "pkg/$pkg/"
           chmod +x "pkg/$pkg/butterscotch" "pkg/$pkg/libsteam_api.dylib" "pkg/$pkg/install.sh" "pkg/$pkg/uninstall.sh" "pkg/$pkg/Install VA-11 Hall-A 64bit.command"
-          cd pkg && zip -r "$pkg.zip" "$pkg"
+          xattr -cr "pkg/$pkg"
+          find "pkg/$pkg" -name '._*' -delete
+          cd pkg
+          COPYFILE_DISABLE=1 zip -X -r "$pkg.zip" "$pkg"
+          if unzip -Z1 "$pkg.zip" | grep -Eq '(^|/)\._'; then
+            echo "AppleDouble file found in ZIP" >&2
+            exit 1
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7

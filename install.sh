@@ -103,24 +103,14 @@ if [ -z "${APP:-}" ] || [ ! -d "$APP" ]; then
 fi
 [ -f "$APP/Contents/Info.plist" ] || fail "Info.plist is missing from the selected app" "所选 app 中缺少 Info.plist"
 [ -f "$APP/Contents/Resources/game.ios" ] || fail "game.ios is missing; select the Steam release of VA-11 Hall-A" "缺少 game.ios；请选择 Steam 版 VA-11 Hall-A"
-[ -f "$RUNNER_SOURCE" ] || fail "butterscotch is missing next to install.sh; download the complete package" "install.sh 旁缺少 butterscotch；请下载完整发布包"
+[ -x "$RUNNER_SOURCE" ] || fail "butterscotch is missing or not executable next to install.sh; download the complete package" "install.sh 旁缺少 butterscotch 或其不可执行；请下载完整发布包"
 [ -f "$STEAM_API_SOURCE" ] || fail "the official Steamworks runtime is missing next to install.sh; download the complete package" "install.sh 旁缺少官方 Steamworks 运行库；请下载完整发布包"
 
 msg "Target: $APP" "目标：$APP"
 
-RUNNER_ARCHS="$(lipo -archs "$RUNNER_SOURCE" 2>/dev/null || true)"
-case " $RUNNER_ARCHS " in *" arm64 "*) ;; *) fail "bundled runner is missing the arm64 slice" "随附 runner 缺少 arm64 切片" ;; esac
-case " $RUNNER_ARCHS " in *" x86_64 "*) ;; *) fail "bundled runner is missing the x86_64 slice" "随附 runner 缺少 x86_64 切片" ;; esac
-msg "Runner architectures: $RUNNER_ARCHS" "Runner 架构：$RUNNER_ARCHS"
-
-STEAM_API_ARCHS="$(lipo -archs "$STEAM_API_SOURCE" 2>/dev/null || true)"
-case " $STEAM_API_ARCHS " in *" arm64 "*) ;; *) fail "Steamworks runtime is missing the arm64 slice" "Steamworks 运行库缺少 arm64 切片" ;; esac
-case " $STEAM_API_ARCHS " in *" x86_64 "*) ;; *) fail "Steamworks runtime is missing the x86_64 slice" "Steamworks 运行库缺少 x86_64 切片" ;; esac
-for symbol in SteamAPI_InitFlat SteamAPI_RunCallbacks SteamAPI_SteamUserStats_v013 SteamAPI_ISteamUserStats_SetAchievement SteamAPI_ISteamUserStats_StoreStats; do
-    nm -gU "$STEAM_API_SOURCE" 2>/dev/null | grep " _$symbol$" >/dev/null \
-        || fail "Steamworks runtime is missing required symbol: $symbol" "Steamworks 运行库缺少必要接口：$symbol"
-done
-msg "Steamworks architectures: $STEAM_API_ARCHS" "Steamworks 架构：$STEAM_API_ARCHS"
+# Architecture and exported-symbol validation is performed while building the
+# release package. Do not invoke lipo/nm here: they require Xcode Command Line
+# Tools, which ordinary players should never need just to install the patch.
 
 # A normal Steam library is user-writable. Protected or external libraries get
 # one standard macOS administrator dialog; no credential is stored or logged.

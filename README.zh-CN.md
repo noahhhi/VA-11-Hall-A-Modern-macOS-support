@@ -35,7 +35,13 @@ cd VA-11-Hall-A-64bit-universal
 ./install.sh
 ```
 
-安装器会明确报告 macOS 版本不支持、Steam 库缺失、app 包结构异常、组件缺少架构或权限不足等错误，并在安装失败时自动回滚，避免留下错误的安装状态。成功后可照常从 Steam 启动游戏。
+安装器会明确报告 macOS 版本不支持、Steam 库缺失、app 包结构异常、安装组件缺失或权限不足等错误，并在安装失败时自动回滚，避免留下错误的安装状态。成功后可照常从 Steam 启动游戏。
+
+如果 PKG 提示安装失败，请在终端运行以下命令。命令会在桌面生成 `VA11-install-log.txt`；前往 [GitHub Issues](https://github.com/noahhhi/VA-11-Hall-A-Modern-macOS-support/issues) 反馈时请附上该文件。
+
+```sh
+/usr/bin/grep -iE 'VA-11|io.github.noahhhi|postinstall|xcrun|lipo|nm|codesign|error' /var/log/install.log | /usr/bin/tail -n 200 > "$HOME/Desktop/VA11-install-log.txt"
+```
 
 > [!IMPORTANT]
 > runner 使用 ad-hoc 签名（由 `install.sh` 在你本机完成重签）。如果 macOS 阻止首次启动，打开 **系统设置 → 隐私与安全性**，点击 **仍要打开**。无需关闭 Gatekeeper，也无需降低系统安全性。

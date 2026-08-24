@@ -23,6 +23,10 @@ fail() {
 RUNNER_ARCHS="$(lipo -archs "$RUNNER" 2>/dev/null || true)"
 case " $RUNNER_ARCHS " in *" arm64 "*) ;; *) fail "runner is missing arm64" ;; esac
 case " $RUNNER_ARCHS " in *" x86_64 "*) ;; *) fail "runner is missing x86_64" ;; esac
+for arch in arm64 x86_64; do
+    MINOS="$(otool -arch "$arch" -l "$RUNNER" | awk '/cmd LC_BUILD_VERSION/{found=1; next} found && $1=="minos"{print $2; exit}')"
+    [ "$MINOS" = "11.0" ] || fail "runner $arch deployment target is ${MINOS:-unknown}; expected 11.0"
+done
 
 STEAM_API_ARCHS="$(lipo -archs "$STEAM_API" 2>/dev/null || true)"
 case " $STEAM_API_ARCHS " in *" arm64 "*) ;; *) fail "Steamworks runtime is missing arm64" ;; esac
@@ -42,11 +46,18 @@ PAYLOAD="$STAGE/payload"
 SUPPORT="$PAYLOAD/Library/Application Support/VA-11-Hall-A-64bit"
 mkdir -p "$SUPPORT" "$OUTPUT_DIR"
 
-install -m 755 "$RUNNER" "$SUPPORT/butterscotch"
-install -m 755 "$STEAM_API" "$SUPPORT/libsteam_api.dylib"
-install -m 755 "$REPO_DIR/install.sh" "$SUPPORT/install.sh"
-install -m 644 "$REPO_DIR/RELEASE_NOTES.md" "$SUPPORT/RELEASE_NOTES.md"
-install -m 644 "$REPO_DIR/LICENSE" "$SUPPORT/LICENSE"
+COPYFILE_DISABLE=1 install -m 755 "$RUNNER" "$SUPPORT/butterscotch"
+COPYFILE_DISABLE=1 install -m 755 "$STEAM_API" "$SUPPORT/libsteam_api.dylib"
+COPYFILE_DISABLE=1 install -m 755 "$REPO_DIR/install.sh" "$SUPPORT/install.sh"
+COPYFILE_DISABLE=1 install -m 644 "$REPO_DIR/RELEASE_NOTES.md" "$SUPPORT/RELEASE_NOTES.md"
+COPYFILE_DISABLE=1 install -m 644 "$REPO_DIR/LICENSE" "$SUPPORT/LICENSE"
+
+# pkgbuild serializes extended attributes as AppleDouble companions. Strip
+# download provenance and other local metadata so no ._* files enter the PKG.
+xattr -cr "$PAYLOAD"
+if find "$PAYLOAD" -name '._*' -print -quit | grep -q .; then
+    fail "AppleDouble file found in staged payload"
+fi
 
 UNSIGNED="$STAGE/unsigned.pkg"
 pkgbuild \
@@ -56,6 +67,10 @@ pkgbuild \
     --version "$VERSION" \
     --install-location / \
     "$UNSIGNED"
+
+if pkgutil --payload-files "$UNSIGNED" | grep -Eq '(^|/)\._'; then
+    fail "AppleDouble file found in built package"
+fi
 
 if [ -n "${PKG_SIGN_IDENTITY:-}" ]; then
     productsign --sign "$PKG_SIGN_IDENTITY" "$UNSIGNED" "$OUTPUT"

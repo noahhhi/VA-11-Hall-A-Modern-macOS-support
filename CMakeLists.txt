@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 
+# Release binaries must remain runnable on the oldest macOS version supported
+# by the installer. Set this before project() so CMake's compiler and linker
+# checks use the same deployment target. Callers may still override it.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum supported macOS version")
+endif()
+
 if(PLATFORM STREQUAL "ps3")
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/cmake/ppu.cmake)
 endif()
