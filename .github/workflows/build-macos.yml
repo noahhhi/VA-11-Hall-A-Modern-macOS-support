@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      package_version:
+        description: Version embedded in the PKG receipt
+        required: false
+        default: 1.1.0-preview
 
 permissions:
   contents: write
@@ -98,7 +103,7 @@ jobs:
           done
           chmod +x dist-bin/butterscotch-universal
           codesign --force --sign - dist-bin/butterscotch-universal
-          version="1.1.0-preview"
+          version="${{ github.event.inputs.package_version || '1.1.0-preview' }}"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME#v}"; fi
           packaging/build-pkg.sh "$version" dist-bin/butterscotch-universal
           mkdir -p "pkg/$pkg"
